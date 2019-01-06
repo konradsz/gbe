@@ -1,12 +1,15 @@
 pub struct Registers {
     a: u8,
-    bc: u16,
-    de: u16,
-    hl: u16,
+    b: u8,
+    c: u8,
+    d: u8,
+    e: u8,
+    h: u8,
+    l: u8,
     f: FlagRegister,
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 struct FlagRegister {
     z: bool, // zero flag
     n: bool, // substract flag
@@ -18,9 +21,12 @@ impl Registers {
     pub fn new() -> Registers {
         Registers {
             a: 0,
-            bc: 0,
-            de: 0,
-            hl: 0,
+            b: 0,
+            c: 0,
+            d: 0,
+            e: 0,
+            h: 0,
+            l: 0,
             f: Default::default(),
         }
     }
@@ -34,57 +40,51 @@ impl Registers {
     }
 
     pub fn get_b(&self) -> u8 {
-        (self.bc >> 8) as u8
+        self.b
     }
 
     pub fn set_b(&mut self, value: u8) {
-        let c = self.bc & 0x00FF;
-        self.bc = u16::from(value) << 8 | c;
+        self.b = value;
     }
 
     pub fn get_c(&self) -> u8 {
-        (self.bc & 0x00FF) as u8
+        self.c
     }
 
     pub fn set_c(&mut self, value: u8) {
-        let b = self.bc >> 8;
-        self.bc = b << 8 | u16::from(value);
+        self.c = value;
     }
 
     pub fn get_d(&self) -> u8 {
-        (self.de >> 8) as u8
+        self.d
     }
 
     pub fn set_d(&mut self, value: u8) {
-        let e = self.de & 0x00FF;
-        self.de = u16::from(value) << 8 | e;
+        self.d = value;
     }
 
     pub fn get_e(&self) -> u8 {
-        (self.de & 0x00FF) as u8
+        self.e
     }
 
     pub fn set_e(&mut self, value: u8) {
-        let d = self.de >> 8;
-        self.de = d << 8 | u16::from(value);
+        self.e = value;
     }
 
     pub fn get_h(&self) -> u8 {
-        (self.hl >> 8) as u8
+        self.h
     }
 
     pub fn set_h(&mut self, value: u8) {
-        let l = self.hl & 0x00FF;
-        self.hl = u16::from(value) << 8 | l;
+        self.h = value;
     }
 
     pub fn get_l(&self) -> u8 {
-        (self.hl & 0x00FF) as u8
+        self.l
     }
 
     pub fn set_l(&mut self, value: u8) {
-        let h = self.hl >> 8;
-        self.hl = h << 8 | u16::from(value);
+        self.l = value;
     }
 
     pub fn get_f(&self) -> u8 {
@@ -94,27 +94,30 @@ impl Registers {
     pub fn set_f(&mut self, value: u8) {}
 
     pub fn get_bc(&self) -> u16 {
-        self.bc
+        u16::from(self.b) << 8 | u16::from(self.c)
     }
 
     pub fn set_bc(&mut self, value: u16) {
-        self.bc = value;
+        self.b = (value >> 8) as u8;
+        self.c = (value & 0xFF) as u8;
     }
 
     pub fn get_de(&self) -> u16 {
-        self.de
+        u16::from(self.d) << 8 | u16::from(self.e)
     }
 
     pub fn set_de(&mut self, value: u16) {
-        self.de = value;
+        self.d = (value >> 8) as u8;
+        self.e = (value & 0xFF) as u8;
     }
 
     pub fn get_hl(&self) -> u16 {
-        self.hl
+        u16::from(self.h) << 8 | u16::from(self.l)
     }
 
     pub fn set_hl(&mut self, value: u16) {
-        self.hl = value;
+        self.h = (value >> 8) as u8;
+        self.l = (value & 0xFF) as u8;
     }
 }
 
@@ -181,25 +184,17 @@ mod tests {
     }
 
     #[test]
-    fn register_f() {
-        let mut registers = Registers::new();
-        assert_eq!(registers.get_f(), 0x0);
-        registers.set_f(BYTE);
-        assert_eq!(registers.get_f(), BYTE);
-    }
-
-    #[test]
     fn register_bc() {
         let mut registers = Registers::new();
         assert_eq!(registers.get_bc(), 0x0);
         registers.set_bc(TWO_BYTES);
         assert_eq!(registers.get_bc(), TWO_BYTES);
 
-        registers.set_b(0xFF);
-        assert_eq!(registers.get_bc(), 0xFFAD);
+        registers.set_b(0xBE);
+        assert_eq!(registers.get_bc(), 0xBEAD);
 
-        registers.set_c(0xEE);
-        assert_eq!(registers.get_bc(), 0xFFEE);
+        registers.set_c(0xEF);
+        assert_eq!(registers.get_bc(), 0xBEEF);
     }
 
     #[test]
@@ -209,11 +204,11 @@ mod tests {
         registers.set_de(TWO_BYTES);
         assert_eq!(registers.get_de(), TWO_BYTES);
 
-        registers.set_d(0xFF);
-        assert_eq!(registers.get_de(), 0xFFAD);
+        registers.set_d(0xBE);
+        assert_eq!(registers.get_de(), 0xBEAD);
 
-        registers.set_e(0xEE);
-        assert_eq!(registers.get_de(), 0xFFEE);
+        registers.set_e(0xEF);
+        assert_eq!(registers.get_de(), 0xBEEF);
     }
 
     #[test]
@@ -223,10 +218,10 @@ mod tests {
         registers.set_hl(TWO_BYTES);
         assert_eq!(registers.get_hl(), TWO_BYTES);
 
-        registers.set_h(0xFF);
-        assert_eq!(registers.get_hl(), 0xFFAD);
+        registers.set_h(0xBE);
+        assert_eq!(registers.get_hl(), 0xBEAD);
 
-        registers.set_l(0xEE);
-        assert_eq!(registers.get_hl(), 0xFFEE);
+        registers.set_l(0xEF);
+        assert_eq!(registers.get_hl(), 0xBEEF);
     }
 }
