@@ -9,7 +9,7 @@ pub struct Registers {
     f: FlagRegister,
 }
 
-#[derive(Default, Clone)]
+#[derive(Clone, Copy)]
 struct FlagRegister {
     z: bool, // zero flag
     n: bool, // substract flag
@@ -27,7 +27,7 @@ impl Registers {
             e: 0,
             h: 0,
             l: 0,
-            f: Default::default(),
+            f: FlagRegister::from(0),
         }
     }
 
@@ -88,10 +88,12 @@ impl Registers {
     }
 
     pub fn get_f(&self) -> u8 {
-        0
+        u8::from(self.f)
     }
 
-    pub fn set_f(&mut self, value: u8) {}
+    pub fn set_f(&mut self, value: u8) {
+        self.f = FlagRegister::from(value);
+    }
 
     pub fn get_bc(&self) -> u16 {
         u16::from(self.b) << 8 | u16::from(self.c)
@@ -118,6 +120,31 @@ impl Registers {
     pub fn set_hl(&mut self, value: u16) {
         self.h = (value >> 8) as u8;
         self.l = (value & 0xFF) as u8;
+    }
+}
+
+const Z_FLAG_SHIFT: u8 = 7;
+const N_FLAG_SHIFT: u8 = 6;
+const H_FLAG_SHIFT: u8 = 5;
+const C_FLAG_SHIFT: u8 = 4;
+
+impl std::convert::From<FlagRegister> for u8 {
+    fn from(flag: FlagRegister) -> u8 {
+        0b0 | u8::from(flag.z) << Z_FLAG_SHIFT
+            | u8::from(flag.n) << N_FLAG_SHIFT
+            | u8::from(flag.h) << H_FLAG_SHIFT
+            | u8::from(flag.c) << C_FLAG_SHIFT
+    }
+}
+
+impl std::convert::From<u8> for FlagRegister {
+    fn from(value: u8) -> FlagRegister {
+        FlagRegister {
+            z: value & 0b1 << Z_FLAG_SHIFT != 0,
+            n: value & 0b1 << N_FLAG_SHIFT != 0,
+            h: value & 0b1 << H_FLAG_SHIFT != 0,
+            c: value & 0b1 << C_FLAG_SHIFT != 0,
+        }
     }
 }
 
@@ -223,5 +250,36 @@ mod tests {
 
         registers.set_l(0xEF);
         assert_eq!(registers.get_hl(), 0xBEEF);
+    }
+
+    #[test]
+    fn register_f() {
+        let mut registers = Registers::new();
+        assert_eq!(registers.get_f(), 0b00000000);
+
+        registers.set_f(0b10000000);
+        assert_eq!(registers.get_f(), 0b10000000);
+
+        registers.set_f(0b01000000);
+        assert_eq!(registers.get_f(), 0b01000000);
+
+        registers.set_f(0b00100000);
+        assert_eq!(registers.get_f(), 0b00100000);
+
+        registers.set_f(0b00010000);
+        assert_eq!(registers.get_f(), 0b00010000);
+
+        registers.set_f(0b11000000);
+        assert_eq!(registers.get_f(), 0b11000000);
+
+        registers.set_f(0b11100000);
+        assert_eq!(registers.get_f(), 0b11100000);
+
+        registers.set_f(0b11110000);
+        assert_eq!(registers.get_f(), 0b11110000);
+
+        // lower 4 bits are ignored
+        registers.set_f(0b11111111);
+        assert_eq!(registers.get_f(), 0b11110000);
     }
 }
