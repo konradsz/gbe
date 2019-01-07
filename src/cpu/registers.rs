@@ -123,27 +123,29 @@ impl Registers {
     }
 }
 
-const Z_FLAG_SHIFT: u8 = 7;
-const N_FLAG_SHIFT: u8 = 6;
-const H_FLAG_SHIFT: u8 = 5;
-const C_FLAG_SHIFT: u8 = 4;
+impl FlagRegister {
+    const Z_FLAG_SHIFT: u8 = 7;
+    const N_FLAG_SHIFT: u8 = 6;
+    const H_FLAG_SHIFT: u8 = 5;
+    const C_FLAG_SHIFT: u8 = 4;
+}
 
 impl std::convert::From<FlagRegister> for u8 {
     fn from(flag: FlagRegister) -> u8 {
-        0b0 | u8::from(flag.z) << Z_FLAG_SHIFT
-            | u8::from(flag.n) << N_FLAG_SHIFT
-            | u8::from(flag.h) << H_FLAG_SHIFT
-            | u8::from(flag.c) << C_FLAG_SHIFT
+        u8::from(flag.z) << FlagRegister::Z_FLAG_SHIFT
+            | u8::from(flag.n) << FlagRegister::N_FLAG_SHIFT
+            | u8::from(flag.h) << FlagRegister::H_FLAG_SHIFT
+            | u8::from(flag.c) << FlagRegister::C_FLAG_SHIFT
     }
 }
 
 impl std::convert::From<u8> for FlagRegister {
     fn from(value: u8) -> FlagRegister {
         FlagRegister {
-            z: value & 0b1 << Z_FLAG_SHIFT != 0,
-            n: value & 0b1 << N_FLAG_SHIFT != 0,
-            h: value & 0b1 << H_FLAG_SHIFT != 0,
-            c: value & 0b1 << C_FLAG_SHIFT != 0,
+            z: value & 0b1 << FlagRegister::Z_FLAG_SHIFT != 0,
+            n: value & 0b1 << FlagRegister::N_FLAG_SHIFT != 0,
+            h: value & 0b1 << FlagRegister::H_FLAG_SHIFT != 0,
+            c: value & 0b1 << FlagRegister::C_FLAG_SHIFT != 0,
         }
     }
 }
