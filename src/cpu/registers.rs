@@ -121,6 +121,22 @@ impl Registers {
         self.h = (value >> 8) as u8;
         self.l = (value & 0xFF) as u8;
     }
+
+    pub fn set_z_flag(&mut self, state: bool) {
+        self.f.z = state;
+    }
+
+    pub fn set_n_flag(&mut self, state: bool) {
+        self.f.n = state;
+    }
+
+    pub fn set_h_flag(&mut self, state: bool) {
+        self.f.h = state;
+    }
+
+    pub fn set_c_flag(&mut self, state: bool) {
+        self.f.c = state;
+    }
 }
 
 impl FlagRegister {
@@ -282,6 +298,23 @@ mod tests {
 
         // lower 4 bits are ignored
         registers.set_f(0b11111111);
+        assert_eq!(registers.get_f(), 0b11110000);
+
+        registers.set_z_flag(false);
+        assert_eq!(registers.get_f(), 0b01110000);
+        registers.set_n_flag(false);
+        assert_eq!(registers.get_f(), 0b00110000);
+        registers.set_h_flag(false);
+        assert_eq!(registers.get_f(), 0b00010000);
+        registers.set_c_flag(false);
+        assert_eq!(registers.get_f(), 0b00000000);
+        registers.set_z_flag(true);
+        assert_eq!(registers.get_f(), 0b10000000);
+        registers.set_n_flag(true);
+        assert_eq!(registers.get_f(), 0b11000000);
+        registers.set_h_flag(true);
+        assert_eq!(registers.get_f(), 0b11100000);
+        registers.set_c_flag(true);
         assert_eq!(registers.get_f(), 0b11110000);
     }
 }
