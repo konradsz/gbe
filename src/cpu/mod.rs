@@ -47,7 +47,7 @@ impl Cpu {
                 self.registers.set_hl(new_value);
                 self.registers.set_n_flag(false);
                 self.registers.set_h_flag(overflowed);
-                self.registers.set_c_flag((current_value & 0xFFF + value & 0xFFF) > 0xFFF);
+                self.registers.set_c_flag((current_value & 0xFFF) + (value & 0xFFF) > 0xFFF);
             }
         }
     }
@@ -79,22 +79,28 @@ mod tests {
     use super::*;
 
     #[test]
-    fn cpu_add_test() {
-        const OLD_VALUE: u16 = 0xDEAD;
-        const SOURCE_VALUE: u16 = 0x1234;
-        const SUM: u16 = OLD_VALUE + SOURCE_VALUE;
-
+    fn cpu_add16_test() {
         let mut cpu = Cpu::new();
-        cpu.registers.set_bc(SOURCE_VALUE);
-        cpu.registers.set_hl(OLD_VALUE);
+        cpu.registers.set_hl(0x1234);
+        cpu.registers.set_bc(0x2345);
         cpu.registers.set_f(0b11000000);
 
         cpu.execute_instruction(Instruction::Add16(AddSource::BC));
-        assert_eq!(cpu.registers.get_hl(), SUM);
+        assert_eq!(cpu.registers.get_hl(), 0x1234 + 0x2345);
         assert_eq!(cpu.registers.get_f(), 0b10000000);
 
-        let overflowed_value = SUM.wrapping_add(SOURCE_VALUE);
+        // check for half carry flag
+        cpu.registers.set_hl(0b0000111111111111);
+        cpu.registers.set_bc(0b1);
+        cpu.execute_instruction(Instruction::Add16(AddSource::BC));
+        assert_eq!(cpu.registers.get_hl(), 0b0001000000000000);
+        assert_eq!(cpu.registers.get_f(), 0b10010000);
+
+        // check for carry flag
+        cpu.registers.set_bc(0xFFFE);
+        let overflowed_value = 0b0001000000000000u16.wrapping_add(0xFFFE);
         cpu.execute_instruction(Instruction::Add16(AddSource::BC));
         assert_eq!(cpu.registers.get_hl(), overflowed_value);
+        assert_eq!(cpu.registers.get_f(), 0b10100000);
     }
 }
