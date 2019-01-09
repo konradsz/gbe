@@ -12,15 +12,11 @@ struct MemoryBus {
 }
 
 enum Instruction {
-    Add(AddSource, AddDestination)
+    Add16(AddSource)
 }
 
 enum AddSource {
     BC
-}
-
-enum AddDestination {
-    HL
 }
 
 impl Cpu {
@@ -41,27 +37,24 @@ impl Cpu {
 
     fn execute_instruction(&mut self, instruction: Instruction) {
         match instruction {
-            Instruction::Add(source, destination) => {
+            Instruction::Add16(source) => {
                 let value = match source {
                     AddSource::BC => self.registers.get_bc()
                 };
-                match destination {
-                    AddDestination::HL => {
-                        let current_value = self.registers.get_hl();
-                        let (new_value, overflowed) = current_value.overflowing_add(value);
-                        self.registers.set_hl(new_value);
-                        self.registers.set_n_flag(false);
-                        self.registers.set_h_flag(overflowed);
-                        self.registers.set_c_flag((current_value & 0xFF + value & 0xFF) > 0xFF);
-                    }
-                };
+
+                let current_value = self.registers.get_hl();
+                let (new_value, overflowed) = current_value.overflowing_add(value);
+                self.registers.set_hl(new_value);
+                self.registers.set_n_flag(false);
+                self.registers.set_h_flag(overflowed);
+                self.registers.set_c_flag((current_value & 0xFFF + value & 0xFFF) > 0xFFF);
             }
         }
     }
 
     fn decode_opcode(opcode: u8) -> Instruction {
         match opcode {
-            0x09 => Instruction::Add(AddSource::BC, AddDestination::HL),
+            0x09 => Instruction::Add16(AddSource::BC),
             _ => panic!("{} not implemented!", opcode)
         }
     }
@@ -96,12 +89,12 @@ mod tests {
         cpu.registers.set_hl(OLD_VALUE);
         cpu.registers.set_f(0b11000000);
 
-        cpu.execute_instruction(Instruction::Add(AddSource::BC, AddDestination::HL));
+        cpu.execute_instruction(Instruction::Add16(AddSource::BC));
         assert_eq!(cpu.registers.get_hl(), SUM);
         assert_eq!(cpu.registers.get_f(), 0b10000000);
 
         let overflowed_value = SUM.wrapping_add(SOURCE_VALUE);
-        cpu.execute_instruction(Instruction::Add(AddSource::BC, AddDestination::HL));
+        cpu.execute_instruction(Instruction::Add16(AddSource::BC));
         assert_eq!(cpu.registers.get_hl(), overflowed_value);
     }
 }
