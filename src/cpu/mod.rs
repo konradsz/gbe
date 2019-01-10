@@ -7,11 +7,12 @@ use self::registers::Registers;
 pub struct Cpu {
     registers: Registers,
     pc: u16,
-    memory_bus: MemoryBus
+    sp: u16,
+    memory_bus: MemoryBus,
 }
 
 struct MemoryBus {
-    memory: [u8; MemoryBus::TOTAL_MEMORY_SIZE]
+    memory: [u8; MemoryBus::TOTAL_MEMORY_SIZE],
 }
 
 impl Cpu {
@@ -19,7 +20,8 @@ impl Cpu {
         Cpu {
             registers: Registers::new(),
             pc: 0x0,
-            memory_bus: MemoryBus::new()
+            sp: 0x0,
+            memory_bus: MemoryBus::new(),
         }
     }
 
@@ -33,7 +35,10 @@ impl Cpu {
         match instruction {
             Instruction::Add16(source) => {
                 let value = match source {
-                    AddSource::BC => self.add16(self.registers.get_bc())
+                    AddSource::BC => self.add16(self.registers.get_bc()),
+                    AddSource::DE => self.add16(self.registers.get_de()),
+                    AddSource::HL => self.add16(self.registers.get_de()),
+                    AddSource::SP => self.add16(self.sp),
                 };
             }
         }
@@ -45,7 +50,8 @@ impl Cpu {
         self.registers.set_hl(new_value);
         self.registers.set_n_flag(false);
         self.registers.set_h_flag(overflowed);
-        self.registers.set_c_flag((current_value & 0xFFF) + (value & 0xFFF) > 0xFFF);
+        self.registers
+            .set_c_flag((current_value & 0xFFF) + (value & 0xFFF) > 0xFFF);
     }
 }
 
@@ -54,7 +60,7 @@ impl MemoryBus {
 
     fn new() -> MemoryBus {
         MemoryBus {
-            memory: [0; MemoryBus::TOTAL_MEMORY_SIZE]
+            memory: [0; MemoryBus::TOTAL_MEMORY_SIZE],
         }
     }
 
@@ -70,26 +76,19 @@ mod tests {
     #[test]
     fn cpu_add16_test() {
         let mut cpu = Cpu::new();
-        cpu.registers.set_hl(0x1234);
-        cpu.registers.set_bc(0x2345);
-        cpu.registers.set_f(0b11000000);
-
-        cpu.execute_instruction(Instruction::Add16(AddSource::BC));
-        assert_eq!(cpu.registers.get_hl(), 0x1234 + 0x2345);
-        assert_eq!(cpu.registers.get_f(), 0b10000000);
-
-        // check for half carry flag
         cpu.registers.set_hl(0xFFF);
-        cpu.registers.set_bc(0x1);
-        cpu.execute_instruction(Instruction::Add16(AddSource::BC));
+        cpu.registers.set_de(0x1);
+        cpu.registers.set_f(0b11000000);
+        // check that substract flag is reset and half carry flag is set
+        cpu.add16(cpu.registers.get_de());
         assert_eq!(cpu.registers.get_hl(), 0x1000);
         assert_eq!(cpu.registers.get_f(), 0b10010000);
 
-        // check for carry flag
-        cpu.registers.set_bc(0xFFFE);
-        let overflowed_value = 0x1000u16.wrapping_add(0xFFFE);
-        cpu.execute_instruction(Instruction::Add16(AddSource::BC));
+        cpu.registers.set_hl(0x8888);
+        let overflowed_value = 0x8888u16.wrapping_add(0x8888);
+        // check that carry flag is set
+        cpu.add16(cpu.registers.get_hl());
         assert_eq!(cpu.registers.get_hl(), overflowed_value);
-        assert_eq!(cpu.registers.get_f(), 0b10100000);
+        assert_eq!(cpu.registers.get_f(), 0b10110000);
     }
 }
