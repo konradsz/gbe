@@ -1,4 +1,5 @@
 pub enum Instruction {
+    Nop,
     Add16(AddSource),
 }
 
@@ -12,7 +13,7 @@ pub enum AddSource {
 impl Instruction {
     pub fn decode_opcode(opcode: u8) -> Self {
         match opcode {
-            0x00 => panic!("{} not implemented", opcode),
+            0x00 => Instruction::Nop,
             0x01 => panic!("{} not implemented", opcode),
             0x02 => panic!("{} not implemented", opcode),
             0x03 => panic!("{} not implemented", opcode),

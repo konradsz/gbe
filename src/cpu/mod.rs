@@ -6,8 +6,6 @@ use self::registers::Registers;
 
 pub struct Cpu {
     registers: Registers,
-    pc: u16,
-    sp: u16,
     memory_bus: MemoryBus,
 }
 
@@ -19,26 +17,25 @@ impl Cpu {
     pub fn new() -> Cpu {
         Cpu {
             registers: Registers::new(),
-            pc: 0x0,
-            sp: 0x0,
             memory_bus: MemoryBus::new(),
         }
     }
 
     fn step(&mut self) {
-        let opcode = self.memory_bus.read_byte(self.pc);
+        let opcode = self.memory_bus.read_byte(self.registers.get_pc());
         let instruction = Instruction::decode_opcode(opcode);
         self.execute_instruction(instruction);
     }
 
     fn execute_instruction(&mut self, instruction: Instruction) {
         match instruction {
+            Instruction::Nop => (),
             Instruction::Add16(source) => {
                 let value = match source {
                     AddSource::BC => self.add16(self.registers.get_bc()),
                     AddSource::DE => self.add16(self.registers.get_de()),
                     AddSource::HL => self.add16(self.registers.get_de()),
-                    AddSource::SP => self.add16(self.sp),
+                    AddSource::SP => self.add16(self.registers.get_sp()),
                 };
             }
         }

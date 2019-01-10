@@ -7,6 +7,8 @@ pub struct Registers {
     h: u8,
     l: u8,
     f: FlagRegister,
+    pc: u16,
+    sp: u16,
 }
 
 #[derive(Clone, Copy)]
@@ -20,14 +22,16 @@ struct FlagRegister {
 impl Registers {
     pub fn new() -> Registers {
         Registers {
-            a: 0,
-            b: 0,
-            c: 0,
-            d: 0,
-            e: 0,
-            h: 0,
-            l: 0,
-            f: FlagRegister::from(0),
+            a: 0x0,
+            b: 0x0,
+            c: 0x0,
+            d: 0x0,
+            e: 0x0,
+            h: 0x0,
+            l: 0x0,
+            f: FlagRegister::from(0x0),
+            pc: 0x0,
+            sp: 0x0
         }
     }
 
@@ -136,6 +140,14 @@ impl Registers {
 
     pub fn set_c_flag(&mut self, state: bool) {
         self.f.c = state;
+    }
+
+    pub fn get_pc(&self) -> u16 {
+        self.pc
+    }
+
+    pub fn get_sp(&self) -> u16 {
+        self.sp
     }
 }
 
@@ -316,5 +328,17 @@ mod tests {
         assert_eq!(registers.get_f(), 0b11100000);
         registers.set_c_flag(true);
         assert_eq!(registers.get_f(), 0b11110000);
+    }
+
+    #[test]
+    fn register_pc() {
+        let registers = Registers::new();
+        assert_eq!(registers.get_pc(), 0x0);
+    }
+
+    #[test]
+    fn register_sp() {
+        let registers = Registers::new();
+        assert_eq!(registers.get_sp(), 0x0);
     }
 }
