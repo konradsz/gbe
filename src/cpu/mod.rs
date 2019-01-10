@@ -33,17 +33,19 @@ impl Cpu {
         match instruction {
             Instruction::Add16(source) => {
                 let value = match source {
-                    AddSource::BC => self.registers.get_bc()
+                    AddSource::BC => self.add16(self.registers.get_bc())
                 };
-
-                let current_value = self.registers.get_hl();
-                let (new_value, overflowed) = current_value.overflowing_add(value);
-                self.registers.set_hl(new_value);
-                self.registers.set_n_flag(false);
-                self.registers.set_h_flag(overflowed);
-                self.registers.set_c_flag((current_value & 0xFFF) + (value & 0xFFF) > 0xFFF);
             }
         }
+    }
+
+    fn add16(&mut self, value: u16) {
+        let current_value = self.registers.get_hl();
+        let (new_value, overflowed) = current_value.overflowing_add(value);
+        self.registers.set_hl(new_value);
+        self.registers.set_n_flag(false);
+        self.registers.set_h_flag(overflowed);
+        self.registers.set_c_flag((current_value & 0xFFF) + (value & 0xFFF) > 0xFFF);
     }
 }
 
