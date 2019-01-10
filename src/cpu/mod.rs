@@ -1,3 +1,6 @@
+mod instruction;
+use self::instruction::*;
+
 mod registers;
 use self::registers::Registers;
 
@@ -11,14 +14,6 @@ struct MemoryBus {
     memory: [u8; MemoryBus::TOTAL_MEMORY_SIZE]
 }
 
-enum Instruction {
-    Add16(AddSource)
-}
-
-enum AddSource {
-    BC
-}
-
 impl Cpu {
     pub fn new() -> Cpu {
         Cpu {
@@ -30,8 +25,7 @@ impl Cpu {
 
     fn step(&mut self) {
         let opcode = self.memory_bus.read_byte(self.pc);
-        // create Instruction struct that can be matched to enum (?)
-        let instruction = Self::decode_opcode(opcode);
+        let instruction = Instruction::decode_opcode(opcode);
         self.execute_instruction(instruction);
     }
 
@@ -49,13 +43,6 @@ impl Cpu {
                 self.registers.set_h_flag(overflowed);
                 self.registers.set_c_flag((current_value & 0xFFF) + (value & 0xFFF) > 0xFFF);
             }
-        }
-    }
-
-    fn decode_opcode(opcode: u8) -> Instruction {
-        match opcode {
-            0x09 => Instruction::Add16(AddSource::BC),
-            _ => panic!("{} not implemented!", opcode)
         }
     }
 }
@@ -90,15 +77,15 @@ mod tests {
         assert_eq!(cpu.registers.get_f(), 0b10000000);
 
         // check for half carry flag
-        cpu.registers.set_hl(0b0000111111111111);
-        cpu.registers.set_bc(0b1);
+        cpu.registers.set_hl(0xFFF);
+        cpu.registers.set_bc(0x1);
         cpu.execute_instruction(Instruction::Add16(AddSource::BC));
-        assert_eq!(cpu.registers.get_hl(), 0b0001000000000000);
+        assert_eq!(cpu.registers.get_hl(), 0x1000);
         assert_eq!(cpu.registers.get_f(), 0b10010000);
 
         // check for carry flag
         cpu.registers.set_bc(0xFFFE);
-        let overflowed_value = 0b0001000000000000u16.wrapping_add(0xFFFE);
+        let overflowed_value = 0x1000u16.wrapping_add(0xFFFE);
         cpu.execute_instruction(Instruction::Add16(AddSource::BC));
         assert_eq!(cpu.registers.get_hl(), overflowed_value);
         assert_eq!(cpu.registers.get_f(), 0b10100000);
