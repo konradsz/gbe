@@ -28,39 +28,46 @@ impl Cpu {
     }
 
     fn execute_instruction(&mut self, instruction: Instruction) {
-        match instruction {
+        match &instruction {
             Instruction::Nop => (),
-            Instruction::Inc(target) => {
+            Instruction::Inc(target) | Instruction::Dec(target) => {
+                let perform_operation = |cpu: &mut Cpu, instruction: &Instruction, value| -> u8 {
+                    match instruction {
+                        Instruction::Inc(_) => cpu.increment(value),
+                        Instruction::Dec(_) => cpu.decrement(value),
+                        _ => 0
+                    }
+                };
                 match target {
-                    IncTarget::A => {
-                        let value = self.increment(self.registers.get_a());
+                    IncDecTarget::A => {
+                        let value = perform_operation(self, &instruction, self.registers.get_a());
                         self.registers.set_a(value);
                     },
-                    IncTarget::B => {
+                    IncDecTarget::B => {
                         let value = self.increment(self.registers.get_b());
                         self.registers.set_b(value);
                     },
-                    IncTarget::C => {
+                    IncDecTarget::C => {
                         let value = self.increment(self.registers.get_c());
                         self.registers.set_c(value);
                     }
-                    IncTarget::D => {
+                    IncDecTarget::D => {
                         let value = self.increment(self.registers.get_d());
                         self.registers.set_d(value);
                     },
-                    IncTarget::E => {
+                    IncDecTarget::E => {
                         let value = self.increment(self.registers.get_e());
                         self.registers.set_e(value);
                     },
-                    IncTarget::H => {
+                    IncDecTarget::H => {
                         let value = self.increment(self.registers.get_h());
                         self.registers.set_h(value);
                     },
-                    IncTarget::L => {
+                    IncDecTarget::L => {
                         let value = self.increment(self.registers.get_l());
                         self.registers.set_l(value);
                     }
-                    IncTarget::HL => {
+                    IncDecTarget::HL => {
                         let address = self.registers.get_hl();
                         let value = self.increment(self.memory_bus.read_byte(address));
                         self.memory_bus.write_byte(address, value);
@@ -83,6 +90,15 @@ impl Cpu {
         self.registers.set_z_flag(result == 0);
         self.registers.set_n_flag(false);
         self.registers.set_h_flag(value & 0xF == 0xF);
+
+        result
+    }
+
+    fn decrement(&mut self, value: u8) -> u8 {
+        let result = value.wrapping_add(1);
+        self.registers.set_z_flag(result == 0);
+        self.registers.set_n_flag(true);
+        //self.registers.set_h_flag(value & 0xF == 0xF);
 
         result
     }
@@ -144,13 +160,13 @@ mod tests {
         let mut cpu = Cpu::new();
         cpu.registers.set_b(0xF);
         cpu.registers.set_f(0b11010000);
-        cpu.execute_instruction(Instruction::Inc(IncTarget::B));
+        cpu.execute_instruction(Instruction::Inc(IncDecTarget::B));
         assert_eq!(cpu.registers.get_b(), 0x10);
         assert_eq!(cpu.registers.get_f(), 0b00110000);
 
         cpu.registers.set_c(u8::max_value());
         // check that zero flag is set
-        cpu.execute_instruction(Instruction::Inc(IncTarget::C));
+        cpu.execute_instruction(Instruction::Inc(IncDecTarget::C));
         assert_eq!(cpu.registers.get_c(), 0x0);
         assert_eq!(cpu.registers.get_f(), 0b10110000);
 
@@ -158,7 +174,7 @@ mod tests {
         const VALUE: u8 = 0x1F;
         cpu.memory_bus.write_byte(ADDRESS, VALUE);
         cpu.registers.set_hl(ADDRESS);
-        cpu.execute_instruction(Instruction::Inc(IncTarget::HL));
+        cpu.execute_instruction(Instruction::Inc(IncDecTarget::HL));
         assert_eq!(cpu.memory_bus.read_byte(ADDRESS), VALUE + 1);
     }
 }

@@ -1,10 +1,11 @@
 pub enum Instruction {
     Nop,
-    Inc(IncTarget),
+    Inc(IncDecTarget),
+    Dec(IncDecTarget),
     Add16(AddSource),
 }
 
-pub enum IncTarget {
+pub enum IncDecTarget {
     A,
     B,
     C,
@@ -29,14 +30,14 @@ impl Instruction {
             0x01 => panic!("{} not implemented", opcode),
             0x02 => panic!("{} not implemented", opcode),
             0x03 => panic!("{} not implemented", opcode),
-            0x3C => Instruction::Inc(IncTarget::A),
-            0x04 => Instruction::Inc(IncTarget::B),
-            0x0C => Instruction::Inc(IncTarget::C),
-            0x14 => Instruction::Inc(IncTarget::D),
-            0x1C => Instruction::Inc(IncTarget::E),
-            0x24 => Instruction::Inc(IncTarget::H),
-            0x2C => Instruction::Inc(IncTarget::L),
-            0x34 => Instruction::Inc(IncTarget::HL),
+            0x3C => Instruction::Inc(IncDecTarget::A),
+            0x04 => Instruction::Inc(IncDecTarget::B),
+            0x0C => Instruction::Inc(IncDecTarget::C),
+            0x14 => Instruction::Inc(IncDecTarget::D),
+            0x1C => Instruction::Inc(IncDecTarget::E),
+            0x24 => Instruction::Inc(IncDecTarget::H),
+            0x2C => Instruction::Inc(IncDecTarget::L),
+            0x34 => Instruction::Inc(IncDecTarget::HL),
             0x05 => panic!("{} not implemented", opcode),
             0x06 => panic!("{} not implemented", opcode),
             0x07 => panic!("{} not implemented", opcode),
