@@ -1,13 +1,14 @@
 pub enum Instruction {
-    Nop,
-    Cp(CpTarget),
+    Xor(CpXorTarget),
+    Cp(CpXorTarget),
     Inc(IncDecTarget),
     Dec(IncDecTarget),
     Add16(AddSource),
+    Nop,
 }
 
 #[rustfmt::skip]
-pub enum CpTarget {
+pub enum CpXorTarget {
     A, B, C, D, E, H, L, HL, Byte
 }
 
@@ -24,15 +25,24 @@ pub enum AddSource {
 impl Instruction {
     pub fn decode_opcode(opcode: u8) -> Self {
         match opcode {
-            0xBF => Instruction::Cp(CpTarget::A),
-            0xB8 => Instruction::Cp(CpTarget::B),
-            0xB9 => Instruction::Cp(CpTarget::C),
-            0xBA => Instruction::Cp(CpTarget::D),
-            0xBB => Instruction::Cp(CpTarget::E),
-            0xBC => Instruction::Cp(CpTarget::H),
-            0xBD => Instruction::Cp(CpTarget::L),
-            0xBE => Instruction::Cp(CpTarget::HL),
-            0xFE => Instruction::Cp(CpTarget::Byte),
+            0xAF => Instruction::Xor(CpXorTarget::A),
+            0xA8 => Instruction::Xor(CpXorTarget::B),
+            0xA9 => Instruction::Xor(CpXorTarget::C),
+            0xAA => Instruction::Xor(CpXorTarget::D),
+            0xAB => Instruction::Xor(CpXorTarget::E),
+            0xAC => Instruction::Xor(CpXorTarget::H),
+            0xAD => Instruction::Xor(CpXorTarget::L),
+            0xAE => Instruction::Xor(CpXorTarget::HL),
+            0xEE => Instruction::Xor(CpXorTarget::Byte),
+            0xBF => Instruction::Cp(CpXorTarget::A),
+            0xB8 => Instruction::Cp(CpXorTarget::B),
+            0xB9 => Instruction::Cp(CpXorTarget::C),
+            0xBA => Instruction::Cp(CpXorTarget::D),
+            0xBB => Instruction::Cp(CpXorTarget::E),
+            0xBC => Instruction::Cp(CpXorTarget::H),
+            0xBD => Instruction::Cp(CpXorTarget::L),
+            0xBE => Instruction::Cp(CpXorTarget::HL),
+            0xFE => Instruction::Cp(CpXorTarget::Byte),
             0x3C => Instruction::Inc(IncDecTarget::A),
             0x04 => Instruction::Inc(IncDecTarget::B),
             0x0C => Instruction::Inc(IncDecTarget::C),

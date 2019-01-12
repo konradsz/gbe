@@ -32,16 +32,30 @@ impl Cpu {
 
     fn execute_instruction(&mut self, instruction: Instruction) {
         match &instruction {
+            Instruction::Xor(target) => match target {
+                CpXorTarget::A => self.xor(self.registers.get_a()),
+                CpXorTarget::B => self.xor(self.registers.get_b()),
+                CpXorTarget::C => self.xor(self.registers.get_c()),
+                CpXorTarget::D => self.xor(self.registers.get_d()),
+                CpXorTarget::E => self.xor(self.registers.get_e()),
+                CpXorTarget::H => self.xor(self.registers.get_h()),
+                CpXorTarget::L => self.xor(self.registers.get_l()),
+                CpXorTarget::HL => {
+                    println!("asd: {:x}", self.mmu.read_byte(self.registers.get_hl()));
+                    self.xor(self.mmu.read_byte(self.registers.get_hl()))
+                },
+                CpXorTarget::Byte => self.xor(self.mmu.read_byte(self.registers.get_pc())),
+            },
             Instruction::Cp(target) => match target {
-                CpTarget::A => self.compare(self.registers.get_a()),
-                CpTarget::B => self.compare(self.registers.get_b()),
-                CpTarget::C => self.compare(self.registers.get_c()),
-                CpTarget::D => self.compare(self.registers.get_d()),
-                CpTarget::E => self.compare(self.registers.get_e()),
-                CpTarget::H => self.compare(self.registers.get_h()),
-                CpTarget::L => self.compare(self.registers.get_l()),
-                CpTarget::HL => self.compare(self.mmu.read_byte(self.registers.get_hl())),
-                CpTarget::Byte => self.compare(self.mmu.read_byte(self.registers.get_pc())),
+                CpXorTarget::A => self.compare(self.registers.get_a()),
+                CpXorTarget::B => self.compare(self.registers.get_b()),
+                CpXorTarget::C => self.compare(self.registers.get_c()),
+                CpXorTarget::D => self.compare(self.registers.get_d()),
+                CpXorTarget::E => self.compare(self.registers.get_e()),
+                CpXorTarget::H => self.compare(self.registers.get_h()),
+                CpXorTarget::L => self.compare(self.registers.get_l()),
+                CpXorTarget::HL => self.compare(self.mmu.read_byte(self.registers.get_hl())),
+                CpXorTarget::Byte => self.compare(self.mmu.read_byte(self.registers.get_pc())),
             },
             Instruction::Inc(target) | Instruction::Dec(target) => {
                 let perform_operation = |cpu: &mut Cpu, instruction: &Instruction, value| -> u8 {
@@ -101,6 +115,16 @@ impl Cpu {
         }
     }
 
+    fn xor(&mut self, value: u8) {
+        println!("xor: {:x} ^ {:x}", self.registers.get_a(), value);
+        let result = self.registers.get_a() ^ value;
+        self.registers.set_a(result);
+        self.registers.set_z_flag(result == 0);
+        self.registers.set_n_flag(false);
+        self.registers.set_h_flag(false);
+        self.registers.set_c_flag(false);
+    }
+
     fn compare(&mut self, value: u8) {
         let a_register = self.registers.get_a();
         self.registers.set_z_flag(a_register == value);
@@ -143,23 +167,63 @@ mod tests {
     use super::*;
 
     #[test]
-    fn cpu_add16_test() {
+    fn cpu_xor_test() {
+        let mut cpu = Cpu::new();
+        cpu.registers.set_a(0xDE);
+        cpu.execute_instruction(Instruction::Xor(CpXorTarget::A));
+        assert_eq!(cpu.registers.get_f(), 0b1000_0000);
+
+        cpu.registers.set_b(0xDF);
+        cpu.execute_instruction(Instruction::Xor(CpXorTarget::B));
+        assert_eq!(cpu.registers.get_f(), 0b0000_0000);
+
+        const ADDRESS: u16 = 0xABCD;
+        cpu.mmu.write_byte(ADDRESS, 0xDF);
+        cpu.registers.set_hl(ADDRESS);
+        cpu.execute_instruction(Instruction::Xor(CpXorTarget::HL));
+        assert_eq!(cpu.registers.get_f(), 0b1000_0000);
+
+        cpu.mmu.write_byte(0x1, 0x0);
+        cpu.execute_instruction(Instruction::Xor(CpXorTarget::Byte));
+        assert_eq!(cpu.registers.get_f(), 0b1000_0000);
+    }
+
+    #[test]
+    fn cpu_compare_test() {
         let mut cpu = Cpu::new();
 
-        // check that substract flag is reset and half carry flag is set
-        cpu.registers.set_hl(0xFFF);
-        cpu.registers.set_de(0x1);
-        cpu.registers.set_f(0b1100_0000);
-        cpu.execute_instruction(Instruction::Add16(AddSource::DE));
-        assert_eq!(cpu.registers.get_hl(), 0x1000);
-        assert_eq!(cpu.registers.get_f(), 0b1001_0000);
+        // compare with itself
+        cpu.registers.set_a(0xDE);
+        cpu.execute_instruction(Instruction::Cp(CpXorTarget::A));
+        assert_eq!(cpu.registers.get_f(), 0b1100_0000);
 
-        cpu.registers.set_hl(0x8888);
-        let overflowed_value = 0x8888u16.wrapping_add(0x8888);
-        // check that carry flag is set
-        cpu.execute_instruction(Instruction::Add16(AddSource::HL));
-        assert_eq!(cpu.registers.get_hl(), overflowed_value);
-        assert_eq!(cpu.registers.get_f(), 0b1011_0000);
+        // compare to smaller value
+        cpu.registers.set_b(0x10);
+        cpu.execute_instruction(Instruction::Cp(CpXorTarget::B));
+        assert_eq!(cpu.registers.get_f(), 0b0100_0000);
+
+        // compare to bigger value
+        cpu.registers.set_c(0xFE);
+        cpu.execute_instruction(Instruction::Cp(CpXorTarget::C));
+        assert_eq!(cpu.registers.get_f(), 0b0101_0000);
+
+        // check that half carry flag is set
+        cpu.registers.set_a(0b1100_0000);
+        cpu.registers.set_d(0b1000_1000);
+        cpu.execute_instruction(Instruction::Cp(CpXorTarget::D));
+        assert_eq!(cpu.registers.get_f(), 0b0110_0000);
+
+        const ADDRESS: u16 = 0xABCD;
+        const VALUE: u8 = 0x10;
+        cpu.mmu.write_byte(ADDRESS, VALUE);
+        cpu.registers.set_hl(ADDRESS);
+        cpu.registers.set_a(0xAB);
+        cpu.execute_instruction(Instruction::Cp(CpXorTarget::HL));
+        assert_eq!(cpu.registers.get_f(), 0b0100_0000);
+
+        cpu.mmu.write_byte(0x1, VALUE);
+        cpu.execute_instruction(Instruction::Cp(CpXorTarget::Byte));
+        assert_eq!(cpu.registers.get_f(), 0b0100_0000);
     }
 
     #[test]
@@ -215,40 +279,22 @@ mod tests {
     }
 
     #[test]
-    fn cpu_compare_test() {
+    fn cpu_add16_test() {
         let mut cpu = Cpu::new();
 
-        // compare with itself
-        cpu.registers.set_a(0xDE);
-        cpu.execute_instruction(Instruction::Cp(CpTarget::A));
-        assert_eq!(cpu.registers.get_f(), 0b1100_0000);
+        // check that substract flag is reset and half carry flag is set
+        cpu.registers.set_hl(0xFFF);
+        cpu.registers.set_de(0x1);
+        cpu.registers.set_f(0b1100_0000);
+        cpu.execute_instruction(Instruction::Add16(AddSource::DE));
+        assert_eq!(cpu.registers.get_hl(), 0x1000);
+        assert_eq!(cpu.registers.get_f(), 0b1001_0000);
 
-        // compare to smaller value
-        cpu.registers.set_b(0x10);
-        cpu.execute_instruction(Instruction::Cp(CpTarget::B));
-        assert_eq!(cpu.registers.get_f(), 0b0100_0000);
-
-        // compare to bigger value
-        cpu.registers.set_c(0xFE);
-        cpu.execute_instruction(Instruction::Cp(CpTarget::C));
-        assert_eq!(cpu.registers.get_f(), 0b0101_0000);
-
-        // check that half carry flag is set
-        cpu.registers.set_a(0b1100_0000);
-        cpu.registers.set_d(0b1000_1000);
-        cpu.execute_instruction(Instruction::Cp(CpTarget::D));
-        assert_eq!(cpu.registers.get_f(), 0b0110_0000);
-
-        const ADDRESS: u16 = 0xABCD;
-        const VALUE: u8 = 0x10;
-        cpu.mmu.write_byte(ADDRESS, VALUE);
-        cpu.registers.set_hl(ADDRESS);
-        cpu.registers.set_a(0xAB);
-        cpu.execute_instruction(Instruction::Cp(CpTarget::HL));
-        assert_eq!(cpu.registers.get_f(), 0b0100_0000);
-
-        cpu.mmu.write_byte(0x1, VALUE);
-        cpu.execute_instruction(Instruction::Cp(CpTarget::Byte));
-        assert_eq!(cpu.registers.get_f(), 0b0100_0000);
+        // check that carry flag is set
+        cpu.registers.set_hl(0x8888);
+        let overflowed_value = 0x8888u16.wrapping_add(0x8888);
+        cpu.execute_instruction(Instruction::Add16(AddSource::HL));
+        assert_eq!(cpu.registers.get_hl(), overflowed_value);
+        assert_eq!(cpu.registers.get_f(), 0b1011_0000);
     }
 }
