@@ -4,25 +4,24 @@ use self::instruction::*;
 mod registers;
 use self::registers::Registers;
 
+mod mmu;
+use self::mmu::Mmu;
+
 pub struct Cpu {
     registers: Registers,
-    memory_bus: MemoryBus,
-}
-
-struct MemoryBus {
-    memory: [u8; MemoryBus::TOTAL_MEMORY_SIZE],
+    mmu: Mmu,
 }
 
 impl Cpu {
     pub fn new() -> Cpu {
         Cpu {
             registers: Registers::new(),
-            memory_bus: MemoryBus::new(),
+            mmu: Mmu::new(),
         }
     }
 
     fn step(&mut self) {
-        let opcode = self.memory_bus.read_byte(self.registers.get_pc());
+        let opcode = self.mmu.read_byte(self.registers.get_pc());
         let instruction = Instruction::decode_opcode(opcode);
         self.execute_instruction(instruction);
     }
@@ -69,8 +68,8 @@ impl Cpu {
                     }
                     IncDecTarget::HL => {
                         let address = self.registers.get_hl();
-                        let value = self.increment(self.memory_bus.read_byte(address));
-                        self.memory_bus.write_byte(address, value);
+                        let value = self.increment(self.mmu.read_byte(address));
+                        self.mmu.write_byte(address, value);
                     }
                 }
             },
@@ -114,24 +113,6 @@ impl Cpu {
     }
 }
 
-impl MemoryBus {
-    const TOTAL_MEMORY_SIZE: usize = 0xFFFF;
-
-    fn new() -> MemoryBus {
-        MemoryBus {
-            memory: [0; MemoryBus::TOTAL_MEMORY_SIZE],
-        }
-    }
-
-    fn read_byte(&self, address: u16) -> u8 {
-        self.memory[address as usize]
-    }
-
-    fn write_byte(&mut self, address: u16, value: u8) {
-        self.memory[address as usize] = value;
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -172,9 +153,9 @@ mod tests {
 
         const ADDRESS: u16 = 0xABCD;
         const VALUE: u8 = 0x1F;
-        cpu.memory_bus.write_byte(ADDRESS, VALUE);
+        cpu.mmu.write_byte(ADDRESS, VALUE);
         cpu.registers.set_hl(ADDRESS);
         cpu.execute_instruction(Instruction::Inc(IncDecTarget::HL));
-        assert_eq!(cpu.memory_bus.read_byte(ADDRESS), VALUE + 1);
+        assert_eq!(cpu.mmu.read_byte(ADDRESS), VALUE + 1);
     }
 }
