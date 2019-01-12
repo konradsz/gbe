@@ -1,4 +1,5 @@
 pub enum Instruction {
+    And(RegistersByteTarget),
     Or(RegistersByteTarget),
     Xor(RegistersByteTarget),
     Cp(RegistersByteTarget),
@@ -26,6 +27,15 @@ pub enum AddSource { // Registers16Target
 impl Instruction {
     pub fn decode_opcode(opcode: u8) -> Self {
         match opcode {
+            0xA7 => Instruction::And(RegistersByteTarget::A),
+            0xA0 => Instruction::And(RegistersByteTarget::B),
+            0xA1 => Instruction::And(RegistersByteTarget::C),
+            0xA2 => Instruction::And(RegistersByteTarget::D),
+            0xA3 => Instruction::And(RegistersByteTarget::E),
+            0xA4 => Instruction::And(RegistersByteTarget::H),
+            0xA5 => Instruction::And(RegistersByteTarget::L),
+            0xA6 => Instruction::And(RegistersByteTarget::HL),
+            0xE6 => Instruction::And(RegistersByteTarget::Byte),
             0xB7 => Instruction::Or(RegistersByteTarget::A),
             0xB0 => Instruction::Or(RegistersByteTarget::B),
             0xB1 => Instruction::Or(RegistersByteTarget::C),

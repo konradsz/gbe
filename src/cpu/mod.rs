@@ -32,6 +32,17 @@ impl Cpu {
 
     fn execute_instruction(&mut self, instruction: Instruction) {
         match &instruction {
+            Instruction::And(target) => match target {
+                RegistersByteTarget::A => self.and(self.registers.get_a()),
+                RegistersByteTarget::B => self.and(self.registers.get_b()),
+                RegistersByteTarget::C => self.and(self.registers.get_c()),
+                RegistersByteTarget::D => self.and(self.registers.get_d()),
+                RegistersByteTarget::E => self.and(self.registers.get_e()),
+                RegistersByteTarget::H => self.and(self.registers.get_h()),
+                RegistersByteTarget::L => self.and(self.registers.get_l()),
+                RegistersByteTarget::HL => self.and(self.mmu.read_byte(self.registers.get_hl())),
+                RegistersByteTarget::Byte => self.and(self.mmu.read_byte(self.registers.get_pc())),
+            },
             Instruction::Or(target) => match target {
                 RegistersByteTarget::A => self.or(self.registers.get_a()),
                 RegistersByteTarget::B => self.or(self.registers.get_b()),
@@ -123,6 +134,15 @@ impl Cpu {
         }
     }
 
+    fn and(&mut self, value: u8) {
+        let result = self.registers.get_a() & value;
+        self.registers.set_a(result);
+        self.registers.set_z_flag(result == 0);
+        self.registers.set_n_flag(false);
+        self.registers.set_h_flag(false);
+        self.registers.set_c_flag(false);
+    }
+
     fn or(&mut self, value: u8) {
         let result = self.registers.get_a() | value;
         self.registers.set_a(result);
@@ -181,6 +201,33 @@ impl Cpu {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn cpu_and_test() {
+        let mut cpu = Cpu::new();
+        cpu.registers.set_a(0xAA);
+        cpu.execute_instruction(Instruction::And(RegistersByteTarget::A));
+        assert_eq!(cpu.registers.get_a(), 0xAA);
+        assert_eq!(cpu.registers.get_f(), 0b0000_0000);
+
+        cpu.registers.set_b(0x0);
+        cpu.execute_instruction(Instruction::And(RegistersByteTarget::B));
+        assert_eq!(cpu.registers.get_a(), 0x0);
+        assert_eq!(cpu.registers.get_f(), 0b1000_0000);
+
+        const ADDRESS: u16 = 0xABCD;
+        cpu.registers.set_a(0xFF);
+        cpu.mmu.write_byte(ADDRESS, 0xDE);
+        cpu.registers.set_hl(ADDRESS);
+        cpu.execute_instruction(Instruction::And(RegistersByteTarget::HL));
+        assert_eq!(cpu.registers.get_a(), 0xDE);
+        assert_eq!(cpu.registers.get_f(), 0b0000_0000);
+
+        cpu.mmu.write_byte(cpu.registers.get_pc(), 0xBC);
+        cpu.execute_instruction(Instruction::And(RegistersByteTarget::Byte));
+        assert_eq!(cpu.registers.get_a(), 0x9C);
+        assert_eq!(cpu.registers.get_f(), 0b0000_0000);
+    }
 
     #[test]
     fn cpu_or_test() {
