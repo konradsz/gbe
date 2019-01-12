@@ -1,11 +1,8 @@
 mod instruction;
-use self::instruction::*;
-
-mod registers;
-use self::registers::Registers;
-
 mod mmu;
-use self::mmu::Mmu;
+mod registers;
+
+use self::{instruction::*, mmu::Mmu, registers::Registers};
 
 pub struct Cpu {
     registers: Registers,
@@ -22,19 +19,37 @@ impl Cpu {
 
     fn step(&mut self) {
         let opcode = self.mmu.read_byte(self.registers.get_pc());
-        let instruction = Instruction::decode_opcode(opcode);
+        let instruction;
+        if opcode == 0xCB {
+            panic!("Prefixed instructions not implemented");
+        } else {
+            instruction = Instruction::decode_opcode(opcode);
+        }
         self.execute_instruction(instruction);
     }
 
     fn execute_instruction(&mut self, instruction: Instruction) {
         match &instruction {
             Instruction::Nop => (),
+            Instruction::Cp(target) => {
+                match target {
+                    CpTarget::A => (),
+                    CpTarget::B => (),
+                    CpTarget::C => (),
+                    CpTarget::D => (),
+                    CpTarget::E => (),
+                    CpTarget::H => (),
+                    CpTarget::L => (),
+                    CpTarget::HL => (),
+                    CpTarget::Byte => ()
+                }
+            }
             Instruction::Inc(target) | Instruction::Dec(target) => {
                 let perform_operation = |cpu: &mut Cpu, instruction: &Instruction, value| -> u8 {
                     match instruction {
                         Instruction::Inc(_) => cpu.increment(value),
                         Instruction::Dec(_) => cpu.decrement(value),
-                        _ => 0
+                        _ => 0,
                     }
                 };
 
@@ -42,11 +57,11 @@ impl Cpu {
                     IncDecTarget::A => {
                         let value = perform_operation(self, &instruction, self.registers.get_a());
                         self.registers.set_a(value);
-                    },
+                    }
                     IncDecTarget::B => {
                         let value = perform_operation(self, &instruction, self.registers.get_b());
                         self.registers.set_b(value);
-                    },
+                    }
                     IncDecTarget::C => {
                         let value = perform_operation(self, &instruction, self.registers.get_c());
                         self.registers.set_c(value);
@@ -54,26 +69,27 @@ impl Cpu {
                     IncDecTarget::D => {
                         let value = perform_operation(self, &instruction, self.registers.get_d());
                         self.registers.set_d(value);
-                    },
+                    }
                     IncDecTarget::E => {
                         let value = perform_operation(self, &instruction, self.registers.get_e());
                         self.registers.set_e(value);
-                    },
+                    }
                     IncDecTarget::H => {
                         let value = perform_operation(self, &instruction, self.registers.get_h());
                         self.registers.set_h(value);
-                    },
+                    }
                     IncDecTarget::L => {
                         let value = perform_operation(self, &instruction, self.registers.get_l());
                         self.registers.set_l(value);
                     }
                     IncDecTarget::HL => {
                         let address = self.registers.get_hl();
-                        let value = perform_operation(self, &instruction, self.mmu.read_byte(address));
+                        let value =
+                            perform_operation(self, &instruction, self.mmu.read_byte(address));
                         self.mmu.write_byte(address, value);
                     }
                 }
-            },
+            }
             Instruction::Add16(source) => {
                 match source {
                     AddSource::BC => self.add16(self.registers.get_bc()),
@@ -98,7 +114,7 @@ impl Cpu {
         let result = value.wrapping_sub(1);
         self.registers.set_z_flag(result == 0);
         self.registers.set_n_flag(true);
-        self.registers.set_h_flag(value & 0b1000 > 0 && result & 0b1000 == 0);
+        self.registers.set_h_flag(value & 0xF == 0);
 
         result
     }
@@ -175,10 +191,10 @@ mod tests {
         assert_eq!(cpu.registers.get_b(), 0x0);
         assert_eq!(cpu.registers.get_f(), 0b1101_0000);
 
-        cpu.registers.set_c(0b1000);
+        cpu.registers.set_c(0b10000);
         // check that half carry flag is set
         cpu.execute_instruction(Instruction::Dec(IncDecTarget::C));
-        assert_eq!(cpu.registers.get_c(), 0b111);
+        assert_eq!(cpu.registers.get_c(), 0b1111);
         assert_eq!(cpu.registers.get_f(), 0b0111_0000);
 
         const ADDRESS: u16 = 0xABCD;

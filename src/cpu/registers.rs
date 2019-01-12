@@ -31,7 +31,7 @@ impl Registers {
             l: 0x0,
             f: FlagRegister::from(0x0),
             pc: 0x0,
-            sp: 0x0
+            sp: 0x0,
         }
     }
 
