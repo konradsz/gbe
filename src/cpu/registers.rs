@@ -146,6 +146,10 @@ impl Registers {
         self.pc
     }
 
+    pub fn increment_pc(&mut self) {
+        self.pc += 1;
+    }
+
     pub fn get_sp(&self) -> u16 {
         self.sp
     }
@@ -285,55 +289,57 @@ mod tests {
     #[test]
     fn register_f() {
         let mut registers = Registers::new();
-        assert_eq!(registers.get_f(), 0b00000000);
+        assert_eq!(registers.get_f(), 0b0000_0000);
 
-        registers.set_f(0b10000000);
-        assert_eq!(registers.get_f(), 0b10000000);
+        registers.set_f(0b1000_0000);
+        assert_eq!(registers.get_f(), 0b1000_0000);
 
-        registers.set_f(0b01000000);
-        assert_eq!(registers.get_f(), 0b01000000);
+        registers.set_f(0b0100_0000);
+        assert_eq!(registers.get_f(), 0b0100_0000);
 
-        registers.set_f(0b00100000);
-        assert_eq!(registers.get_f(), 0b00100000);
+        registers.set_f(0b0010_0000);
+        assert_eq!(registers.get_f(), 0b0010_0000);
 
-        registers.set_f(0b00010000);
-        assert_eq!(registers.get_f(), 0b00010000);
+        registers.set_f(0b0001_0000);
+        assert_eq!(registers.get_f(), 0b0001_0000);
 
-        registers.set_f(0b11000000);
-        assert_eq!(registers.get_f(), 0b11000000);
+        registers.set_f(0b1100_0000);
+        assert_eq!(registers.get_f(), 0b1100_0000);
 
-        registers.set_f(0b11100000);
-        assert_eq!(registers.get_f(), 0b11100000);
+        registers.set_f(0b1110_0000);
+        assert_eq!(registers.get_f(), 0b1110_0000);
 
-        registers.set_f(0b11110000);
-        assert_eq!(registers.get_f(), 0b11110000);
+        registers.set_f(0b1111_0000);
+        assert_eq!(registers.get_f(), 0b1111_0000);
 
         // lower 4 bits are ignored
-        registers.set_f(0b11111111);
-        assert_eq!(registers.get_f(), 0b11110000);
+        registers.set_f(0b1111_1111);
+        assert_eq!(registers.get_f(), 0b1111_0000);
 
         registers.set_z_flag(false);
-        assert_eq!(registers.get_f(), 0b01110000);
+        assert_eq!(registers.get_f(), 0b0111_0000);
         registers.set_n_flag(false);
-        assert_eq!(registers.get_f(), 0b00110000);
+        assert_eq!(registers.get_f(), 0b0011_0000);
         registers.set_h_flag(false);
-        assert_eq!(registers.get_f(), 0b00010000);
+        assert_eq!(registers.get_f(), 0b0001_0000);
         registers.set_c_flag(false);
-        assert_eq!(registers.get_f(), 0b00000000);
+        assert_eq!(registers.get_f(), 0b0000_0000);
         registers.set_z_flag(true);
-        assert_eq!(registers.get_f(), 0b10000000);
+        assert_eq!(registers.get_f(), 0b1000_0000);
         registers.set_n_flag(true);
-        assert_eq!(registers.get_f(), 0b11000000);
+        assert_eq!(registers.get_f(), 0b1100_0000);
         registers.set_h_flag(true);
-        assert_eq!(registers.get_f(), 0b11100000);
+        assert_eq!(registers.get_f(), 0b1110_0000);
         registers.set_c_flag(true);
-        assert_eq!(registers.get_f(), 0b11110000);
+        assert_eq!(registers.get_f(), 0b1111_0000);
     }
 
     #[test]
     fn register_pc() {
-        let registers = Registers::new();
+        let mut registers = Registers::new();
         assert_eq!(registers.get_pc(), 0x0);
+        registers.increment_pc();
+        assert_eq!(registers.get_pc(), 0x1);
     }
 
     #[test]
