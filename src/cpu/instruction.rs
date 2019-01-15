@@ -1,4 +1,5 @@
 pub enum Instruction {
+    Add8(RegistersByteTarget),
     And(RegistersByteTarget),
     Or(RegistersByteTarget),
     Xor(RegistersByteTarget),
@@ -27,6 +28,15 @@ pub enum AddSource { // Registers16Target
 impl Instruction {
     pub fn decode_opcode(opcode: u8) -> Self {
         match opcode {
+            0x87 => Instruction::Add8(RegistersByteTarget::A),
+            0x80 => Instruction::Add8(RegistersByteTarget::B),
+            0x81 => Instruction::Add8(RegistersByteTarget::C),
+            0x82 => Instruction::Add8(RegistersByteTarget::D),
+            0x83 => Instruction::Add8(RegistersByteTarget::E),
+            0x84 => Instruction::Add8(RegistersByteTarget::H),
+            0x85 => Instruction::Add8(RegistersByteTarget::L),
+            0x86 => Instruction::Add8(RegistersByteTarget::HL),
+            0xC6 => Instruction::Add8(RegistersByteTarget::Byte),
             0xA7 => Instruction::And(RegistersByteTarget::A),
             0xA0 => Instruction::And(RegistersByteTarget::B),
             0xA1 => Instruction::And(RegistersByteTarget::C),

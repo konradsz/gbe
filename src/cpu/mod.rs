@@ -32,6 +32,17 @@ impl Cpu {
 
     fn execute_instruction(&mut self, instruction: Instruction) {
         match &instruction {
+            Instruction::Add8(target) => match target {
+                RegistersByteTarget::A => self.add8(self.registers.get_a()),
+                RegistersByteTarget::B => self.add8(self.registers.get_b()),
+                RegistersByteTarget::C => self.add8(self.registers.get_c()),
+                RegistersByteTarget::D => self.add8(self.registers.get_d()),
+                RegistersByteTarget::E => self.add8(self.registers.get_e()),
+                RegistersByteTarget::H => self.add8(self.registers.get_h()),
+                RegistersByteTarget::L => self.add8(self.registers.get_l()),
+                RegistersByteTarget::HL => self.add8(self.mmu.read_byte(self.registers.get_hl())),
+                RegistersByteTarget::Byte => self.add8(self.mmu.read_byte(self.registers.get_pc())),
+            },
             Instruction::And(target) => match target {
                 RegistersByteTarget::A => self.and(self.registers.get_a()),
                 RegistersByteTarget::B => self.and(self.registers.get_b()),
@@ -134,6 +145,15 @@ impl Cpu {
         }
     }
 
+    fn add8(&mut self, value: u8) {
+        let current_value = self.registers.get_a();
+        let (new_value, overflowed) = current_value.overflowing_add(value);
+        self.registers.set_a(new_value);
+        self.registers.set_n_flag(false);
+        self.registers.set_h_flag((((current_value & 0xf) + (new_value & 0xf)) & 0x10) == 0x10);
+        self.registers.set_c_flag(overflowed);
+    }
+
     fn and(&mut self, value: u8) {
         let result = self.registers.get_a() & value;
         self.registers.set_a(result);
@@ -201,6 +221,34 @@ impl Cpu {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn cpu_add8_test() {
+        let mut cpu = Cpu::new();
+        cpu.registers.set_a(0x5);
+        cpu.registers.set_f(0b0100_0000);
+        cpu.execute_instruction(Instruction::Add8(RegistersByteTarget::A));
+        assert_eq!(cpu.registers.get_a(), 0xA);
+        assert_eq!(cpu.registers.get_f(), 0b0000_0000);
+
+        cpu.registers.set_b(0xC);
+        cpu.execute_instruction(Instruction::Add8(RegistersByteTarget::B));
+
+        assert_eq!(cpu.registers.get_a(), 0x16);
+        assert_eq!(cpu.registers.get_f(), 0b0010_0000);
+
+        const ADDRESS: u16 = 0xABCD;
+        cpu.mmu.write_byte(ADDRESS, 0xFF);
+        cpu.registers.set_hl(ADDRESS);
+        cpu.execute_instruction(Instruction::Add8(RegistersByteTarget::HL));
+        assert_eq!(cpu.registers.get_a(), 0x15);
+        assert_eq!(cpu.registers.get_f(), 0b0001_0000);
+
+        cpu.mmu.write_byte(cpu.registers.get_pc(), 0xEA);
+        cpu.execute_instruction(Instruction::And(RegistersByteTarget::Byte));
+        assert_eq!(cpu.registers.get_a(), 0x0);
+        assert_eq!(cpu.registers.get_f(), 0b1000_0000);
+    }
 
     #[test]
     fn cpu_and_test() {
