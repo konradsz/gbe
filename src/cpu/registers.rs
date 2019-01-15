@@ -142,6 +142,10 @@ impl Registers {
         self.f.c = state;
     }
 
+    pub fn get_c_flag(&self) -> bool {
+        self.f.c
+    }
+
     pub fn get_pc(&self) -> u16 {
         self.pc
     }

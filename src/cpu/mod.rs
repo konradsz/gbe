@@ -33,15 +33,26 @@ impl Cpu {
     fn execute_instruction(&mut self, instruction: Instruction) {
         match &instruction {
             Instruction::Add8(target) => match target {
-                RegistersByteTarget::A => self.add8(self.registers.get_a()),
-                RegistersByteTarget::B => self.add8(self.registers.get_b()),
-                RegistersByteTarget::C => self.add8(self.registers.get_c()),
-                RegistersByteTarget::D => self.add8(self.registers.get_d()),
-                RegistersByteTarget::E => self.add8(self.registers.get_e()),
-                RegistersByteTarget::H => self.add8(self.registers.get_h()),
-                RegistersByteTarget::L => self.add8(self.registers.get_l()),
-                RegistersByteTarget::HL => self.add8(self.mmu.read_byte(self.registers.get_hl())),
-                RegistersByteTarget::Byte => self.add8(self.mmu.read_byte(self.registers.get_pc())),
+                RegistersByteTarget::A => self.add8(self.registers.get_a(), false),
+                RegistersByteTarget::B => self.add8(self.registers.get_b(), false),
+                RegistersByteTarget::C => self.add8(self.registers.get_c(), false),
+                RegistersByteTarget::D => self.add8(self.registers.get_d(), false),
+                RegistersByteTarget::E => self.add8(self.registers.get_e(), false),
+                RegistersByteTarget::H => self.add8(self.registers.get_h(), false),
+                RegistersByteTarget::L => self.add8(self.registers.get_l(), false),
+                RegistersByteTarget::HL => self.add8(self.mmu.read_byte(self.registers.get_hl()), false),
+                RegistersByteTarget::Byte => self.add8(self.mmu.read_byte(self.registers.get_pc()), false),
+            },
+            Instruction::Adc(target) => match target {
+                RegistersByteTarget::A => self.add8(self.registers.get_a(), true),
+                RegistersByteTarget::B => self.add8(self.registers.get_b(), true),
+                RegistersByteTarget::C => self.add8(self.registers.get_c(), true),
+                RegistersByteTarget::D => self.add8(self.registers.get_d(), true),
+                RegistersByteTarget::E => self.add8(self.registers.get_e(), true),
+                RegistersByteTarget::H => self.add8(self.registers.get_h(), true),
+                RegistersByteTarget::L => self.add8(self.registers.get_l(), true),
+                RegistersByteTarget::HL => self.add8(self.mmu.read_byte(self.registers.get_hl()), true),
+                RegistersByteTarget::Byte => self.add8(self.mmu.read_byte(self.registers.get_pc()), true),
             },
             Instruction::And(target) => match target {
                 RegistersByteTarget::A => self.and(self.registers.get_a()),
@@ -145,11 +156,15 @@ impl Cpu {
         }
     }
 
-    fn add8(&mut self, value: u8) {
+    fn add8(&mut self, mut value: u8, with_carry: bool) {
         let current_value = self.registers.get_a();
+        if with_carry && self.registers.get_c_flag() {
+            value += 1;
+        }
         let (new_value, overflowed) = current_value.overflowing_add(value);
         self.registers.set_a(new_value);
         self.registers.set_n_flag(false);
+        println!("current: {}, new: {}", current_value, new_value);
         self.registers.set_h_flag((((current_value & 0xf) + (new_value & 0xf)) & 0x10) == 0x10);
         self.registers.set_c_flag(overflowed);
     }
@@ -224,9 +239,10 @@ mod tests {
 
     #[test]
     fn cpu_add8_test() {
+        // add without carry flag
         let mut cpu = Cpu::new();
         cpu.registers.set_a(0x5);
-        cpu.registers.set_f(0b0100_0000);
+        cpu.registers.set_f(0b0101_0000);
         cpu.execute_instruction(Instruction::Add8(RegistersByteTarget::A));
         assert_eq!(cpu.registers.get_a(), 0xA);
         assert_eq!(cpu.registers.get_f(), 0b0000_0000);
@@ -244,10 +260,11 @@ mod tests {
         assert_eq!(cpu.registers.get_a(), 0x15);
         assert_eq!(cpu.registers.get_f(), 0b0001_0000);
 
-        cpu.mmu.write_byte(cpu.registers.get_pc(), 0xEA);
-        cpu.execute_instruction(Instruction::And(RegistersByteTarget::Byte));
-        assert_eq!(cpu.registers.get_a(), 0x0);
-        assert_eq!(cpu.registers.get_f(), 0b1000_0000);
+        // add with carry flag
+        cpu.mmu.write_byte(cpu.registers.get_pc(), 0xEB);
+        cpu.execute_instruction(Instruction::Adc(RegistersByteTarget::Byte));
+        assert_eq!(cpu.registers.get_a(), 0x1);
+        assert_eq!(cpu.registers.get_f(), 0b0001_0000);
     }
 
     #[test]
