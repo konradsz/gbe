@@ -55,16 +55,27 @@ impl Cpu {
                 RegistersByteTarget::Byte => self.add8(self.mmu.read_byte(self.registers.get_pc()), true),
             },
             Instruction::Sub(target) => match target {
-                RegistersByteTarget::A => self.sub(self.registers.get_a()),
-                RegistersByteTarget::B => self.sub(self.registers.get_b()),
-                RegistersByteTarget::C => self.sub(self.registers.get_c()),
-                RegistersByteTarget::D => self.sub(self.registers.get_d()),
-                RegistersByteTarget::E => self.sub(self.registers.get_e()),
-                RegistersByteTarget::H => self.sub(self.registers.get_h()),
-                RegistersByteTarget::L => self.sub(self.registers.get_l()),
-                RegistersByteTarget::HL => self.sub(self.mmu.read_byte(self.registers.get_hl())),
-                RegistersByteTarget::Byte => self.sub(self.mmu.read_byte(self.registers.get_pc())),
+                RegistersByteTarget::A => self.sub(self.registers.get_a(), false),
+                RegistersByteTarget::B => self.sub(self.registers.get_b(), false),
+                RegistersByteTarget::C => self.sub(self.registers.get_c(), false),
+                RegistersByteTarget::D => self.sub(self.registers.get_d(), false),
+                RegistersByteTarget::E => self.sub(self.registers.get_e(), false),
+                RegistersByteTarget::H => self.sub(self.registers.get_h(), false),
+                RegistersByteTarget::L => self.sub(self.registers.get_l(), false),
+                RegistersByteTarget::HL => self.sub(self.mmu.read_byte(self.registers.get_hl()), false),
+                RegistersByteTarget::Byte => self.sub(self.mmu.read_byte(self.registers.get_pc()), false),
             },
+            Instruction::Sbc(target) => match target {
+                RegistersByteTarget::A => self.sub(self.registers.get_a(), true),
+                RegistersByteTarget::B => self.sub(self.registers.get_b(), true),
+                RegistersByteTarget::C => self.sub(self.registers.get_c(), true),
+                RegistersByteTarget::D => self.sub(self.registers.get_d(), true),
+                RegistersByteTarget::E => self.sub(self.registers.get_e(), true),
+                RegistersByteTarget::H => self.sub(self.registers.get_h(), true),
+                RegistersByteTarget::L => self.sub(self.registers.get_l(), true),
+                RegistersByteTarget::HL => self.sub(self.mmu.read_byte(self.registers.get_hl()), true),
+                RegistersByteTarget::Byte => ()
+            }
             Instruction::And(target) => match target {
                 RegistersByteTarget::A => self.and(self.registers.get_a()),
                 RegistersByteTarget::B => self.and(self.registers.get_b()),
@@ -180,11 +191,13 @@ impl Cpu {
         self.registers.set_c_flag(overflowed);
     }
 
-    fn sub(&mut self, mut value: u8) {
+    fn sub(&mut self, mut value: u8, with_carry: bool) {
         let current_value = self.registers.get_a();
+        if with_carry && self.registers.get_c_flag() {
+            value += 1;
+        }
         let (new_value, overflowed) = current_value.overflowing_sub(value);
         self.registers.set_a(new_value);
-
         self.registers.set_z_flag(new_value == 0);
         self.registers.set_n_flag(true);
         self.registers.set_h_flag(value & 0xF > current_value & 0xF);
@@ -291,6 +304,7 @@ mod tests {
 
     #[test]
     fn cpu_sub_test() {
+        // sub without carry flag
         let mut cpu = Cpu::new();
         cpu.registers.set_a(0xFA);
         cpu.registers.set_b(0x15);
@@ -314,6 +328,13 @@ mod tests {
         cpu.execute_instruction(Instruction::Sub(RegistersByteTarget::Byte));
         assert_eq!(cpu.registers.get_a(), 0x5);
         assert_eq!(cpu.registers.get_f(), 0b0110_0000);
+
+        // sub with carry flag
+        cpu.registers.set_f(0b0001_0000);
+        cpu.registers.set_c(0x4);
+        cpu.execute_instruction(Instruction::Sbc(RegistersByteTarget::C));
+        assert_eq!(cpu.registers.get_a(), 0x0);
+        assert_eq!(cpu.registers.get_f(), 0b1100_0000);
     }
 
     #[test]
