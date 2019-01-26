@@ -197,11 +197,11 @@ impl Cpu {
     }
 
     fn compare(&mut self, value: u8) {
-        let a_register = self.registers.get_a();
-        self.registers.set_z_flag(a_register == value);
+        let register_a = self.registers.get_a();
+        self.registers.set_z_flag(register_a == value);
         self.registers.set_n_flag(true);
-        self.registers.set_h_flag(a_register & 0xF < value & 0xF);
-        self.registers.set_c_flag(a_register < value);
+        self.registers.set_h_flag(register_a & 0xF < value & 0xF);
+        self.registers.set_c_flag(register_a < value);
     }
 
     fn increment(&mut self, value: u8) -> u8 {
