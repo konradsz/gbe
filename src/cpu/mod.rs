@@ -54,6 +54,17 @@ impl Cpu {
                 RegistersByteTarget::HL => self.add8(self.mmu.read_byte(self.registers.get_hl()), true),
                 RegistersByteTarget::Byte => self.add8(self.mmu.read_byte(self.registers.get_pc()), true),
             },
+            Instruction::Sub(target) => match target {
+                RegistersByteTarget::A => self.sub(self.registers.get_a()),
+                RegistersByteTarget::B => self.sub(self.registers.get_b()),
+                RegistersByteTarget::C => self.sub(self.registers.get_c()),
+                RegistersByteTarget::D => self.sub(self.registers.get_d()),
+                RegistersByteTarget::E => self.sub(self.registers.get_e()),
+                RegistersByteTarget::H => self.sub(self.registers.get_h()),
+                RegistersByteTarget::L => self.sub(self.registers.get_l()),
+                RegistersByteTarget::HL => self.sub(self.mmu.read_byte(self.registers.get_hl())),
+                RegistersByteTarget::Byte => self.sub(self.mmu.read_byte(self.registers.get_pc())),
+            },
             Instruction::And(target) => match target {
                 RegistersByteTarget::A => self.and(self.registers.get_a()),
                 RegistersByteTarget::B => self.and(self.registers.get_b()),
@@ -163,9 +174,20 @@ impl Cpu {
         }
         let (new_value, overflowed) = current_value.overflowing_add(value);
         self.registers.set_a(new_value);
+        self.registers.set_z_flag(new_value == 0);
         self.registers.set_n_flag(false);
-        println!("current: {}, new: {}", current_value, new_value);
         self.registers.set_h_flag((((current_value & 0xf) + (new_value & 0xf)) & 0x10) == 0x10);
+        self.registers.set_c_flag(overflowed);
+    }
+
+    fn sub(&mut self, mut value: u8) {
+        let current_value = self.registers.get_a();
+        let (new_value, overflowed) = current_value.overflowing_sub(value);
+        self.registers.set_a(new_value);
+
+        self.registers.set_z_flag(new_value == 0);
+        self.registers.set_n_flag(true);
+        self.registers.set_h_flag(value & 0xF > current_value & 0xF);
         self.registers.set_c_flag(overflowed);
     }
 
@@ -242,7 +264,7 @@ mod tests {
         // add without carry flag
         let mut cpu = Cpu::new();
         cpu.registers.set_a(0x5);
-        cpu.registers.set_f(0b0101_0000);
+        cpu.registers.set_f(0b1101_0000);
         cpu.execute_instruction(Instruction::Add8(RegistersByteTarget::A));
         assert_eq!(cpu.registers.get_a(), 0xA);
         assert_eq!(cpu.registers.get_f(), 0b0000_0000);
@@ -261,10 +283,37 @@ mod tests {
         assert_eq!(cpu.registers.get_f(), 0b0001_0000);
 
         // add with carry flag
-        cpu.mmu.write_byte(cpu.registers.get_pc(), 0xEB);
+        cpu.mmu.write_byte(cpu.registers.get_pc(), 0xEA);
         cpu.execute_instruction(Instruction::Adc(RegistersByteTarget::Byte));
-        assert_eq!(cpu.registers.get_a(), 0x1);
-        assert_eq!(cpu.registers.get_f(), 0b0001_0000);
+        assert_eq!(cpu.registers.get_a(), 0x0);
+        assert_eq!(cpu.registers.get_f(), 0b1001_0000);
+    }
+
+    #[test]
+    fn cpu_sub_test() {
+        let mut cpu = Cpu::new();
+        cpu.registers.set_a(0xFA);
+        cpu.registers.set_b(0x15);
+        cpu.registers.set_f(0b1000_0000);
+        cpu.execute_instruction(Instruction::Sub(RegistersByteTarget::B));
+        assert_eq!(cpu.registers.get_a(), 0xE5);
+        assert_eq!(cpu.registers.get_f(), 0b0100_0000);
+
+        cpu.execute_instruction(Instruction::Sub(RegistersByteTarget::A));
+        assert_eq!(cpu.registers.get_a(), 0x0);
+        assert_eq!(cpu.registers.get_f(), 0b1100_0000);
+
+        const ADDRESS: u16 = 0xABCD;
+        cpu.mmu.write_byte(ADDRESS, 0xF0);
+        cpu.registers.set_hl(ADDRESS);
+        cpu.execute_instruction(Instruction::Sub(RegistersByteTarget::HL));
+        assert_eq!(cpu.registers.get_a(), 0x10);
+        assert_eq!(cpu.registers.get_f(), 0b0101_0000);
+
+        cpu.mmu.write_byte(cpu.registers.get_pc(), 0xB);
+        cpu.execute_instruction(Instruction::Sub(RegistersByteTarget::Byte));
+        assert_eq!(cpu.registers.get_a(), 0x5);
+        assert_eq!(cpu.registers.get_f(), 0b0110_0000);
     }
 
     #[test]
