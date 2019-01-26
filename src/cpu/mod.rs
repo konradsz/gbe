@@ -32,6 +32,12 @@ impl Cpu {
 
     fn decode_opcode(&self, opcode: u8) -> Instruction {
         match opcode {
+            0x06 => Instruction::Load(LoadTarget::B, self.mmu.read_byte(self.registers.get_pc())),
+            0x0E => Instruction::Load(LoadTarget::C, self.mmu.read_byte(self.registers.get_pc())),
+            0x16 => Instruction::Load(LoadTarget::D, self.mmu.read_byte(self.registers.get_pc())),
+            0x1E => Instruction::Load(LoadTarget::E, self.mmu.read_byte(self.registers.get_pc())),
+            0x26 => Instruction::Load(LoadTarget::H, self.mmu.read_byte(self.registers.get_pc())),
+            0x2E => Instruction::Load(LoadTarget::L, self.mmu.read_byte(self.registers.get_pc())),
             0x87 => Instruction::Add8(self.registers.get_a()),
             0x80 => Instruction::Add8(self.registers.get_b()),
             0x81 => Instruction::Add8(self.registers.get_c()),
@@ -119,16 +125,26 @@ impl Cpu {
             0x25 => Instruction::Dec(IncDecTarget::H),
             0x2D => Instruction::Dec(IncDecTarget::L),
             0x35 => Instruction::Dec(IncDecTarget::HL),
-            0x09 => Instruction::Add16(self.registers.get_bc()),
-            0x19 => Instruction::Add16(self.registers.get_de()),
-            0x29 => Instruction::Add16(self.registers.get_hl()),
-            0x39 => Instruction::Add16(self.registers.get_sp()),
+            0x09 => Instruction::AddHL(self.registers.get_bc()),
+            0x19 => Instruction::AddHL(self.registers.get_de()),
+            0x29 => Instruction::AddHL(self.registers.get_hl()),
+            0x39 => Instruction::AddHL(self.registers.get_sp()),
             _ => Instruction::Nop
         }
     }
 
     fn execute_instruction(&mut self, instruction: Instruction) {
         match &instruction {
+            Instruction::Load(target, value) => {
+                match target {
+                    LoadTarget::B => self.registers.set_b(*value),
+                    LoadTarget::C => self.registers.set_c(*value),
+                    LoadTarget::D => self.registers.set_d(*value),
+                    LoadTarget::E => self.registers.set_e(*value),
+                    LoadTarget::H => self.registers.set_h(*value),
+                    LoadTarget::L => self.registers.set_l(*value),
+                }
+            }
             Instruction::Add8(register_value) => self.add8(*register_value, false),
             Instruction::Adc(register_value) => self.add8(*register_value, true),
             Instruction::Sub(register_value) => self.sub(*register_value, false),
@@ -183,7 +199,7 @@ impl Cpu {
                     }
                 }
             }
-            Instruction::Add16(register_value) => self.add16(*register_value),
+            Instruction::AddHL(register_value) => self.add16(*register_value),
             Instruction::Nop => (),
         }
     }
@@ -281,6 +297,41 @@ impl Cpu {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn cpu_load_test() {
+        let mut cpu = Cpu::new();
+        cpu.mmu.write_byte(cpu.registers.get_pc(), 0xE0);
+        let load_b = cpu.decode_opcode(0x06);
+        cpu.execute_instruction(load_b);
+
+        cpu.mmu.write_byte(cpu.registers.get_pc(), 0xE1);
+        let load_c = cpu.decode_opcode(0x0E);
+        cpu.execute_instruction(load_c);
+
+        cpu.mmu.write_byte(cpu.registers.get_pc(), 0xE2);
+        let load_d = cpu.decode_opcode(0x16);
+        cpu.execute_instruction(load_d);
+
+        cpu.mmu.write_byte(cpu.registers.get_pc(), 0xE3);
+        let load_e = cpu.decode_opcode(0x1E);
+        cpu.execute_instruction(load_e);
+
+        cpu.mmu.write_byte(cpu.registers.get_pc(), 0xE4);
+        let load_h = cpu.decode_opcode(0x26);
+        cpu.execute_instruction(load_h);
+
+        cpu.mmu.write_byte(cpu.registers.get_pc(), 0xE5);
+        let load_l = cpu.decode_opcode(0x2E);
+        cpu.execute_instruction(load_l);
+
+        assert_eq!(cpu.registers.get_b(), 0xE0);
+        assert_eq!(cpu.registers.get_c(), 0xE1);
+        assert_eq!(cpu.registers.get_d(), 0xE2);
+        assert_eq!(cpu.registers.get_e(), 0xE3);
+        assert_eq!(cpu.registers.get_h(), 0xE4);
+        assert_eq!(cpu.registers.get_l(), 0xE5);
+    }
 
     #[test]
     fn cpu_add8_test() {
