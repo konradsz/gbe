@@ -1,5 +1,7 @@
 pub enum Instruction {
     Load(LoadRegister, u8),
+    LoadToMemory(u16, LoadRegister),
+    LoadToMemoryFromMemory(u16, u8),
     Add8(u8),
     Adc(u8),
     Sub(u8),
