@@ -30,14 +30,24 @@ impl Cpu {
         self.execute_instruction(instruction);
     }
 
+    // move back to instruction.rs with cpu as argument
     fn decode_opcode(&self, opcode: u8) -> Instruction {
         match opcode {
-            0x06 => Instruction::Load(LoadTarget::B, self.mmu.read_byte(self.registers.get_pc())),
-            0x0E => Instruction::Load(LoadTarget::C, self.mmu.read_byte(self.registers.get_pc())),
-            0x16 => Instruction::Load(LoadTarget::D, self.mmu.read_byte(self.registers.get_pc())),
-            0x1E => Instruction::Load(LoadTarget::E, self.mmu.read_byte(self.registers.get_pc())),
-            0x26 => Instruction::Load(LoadTarget::H, self.mmu.read_byte(self.registers.get_pc())),
-            0x2E => Instruction::Load(LoadTarget::L, self.mmu.read_byte(self.registers.get_pc())),
+            0x06 => Instruction::Load(LoadRegister::B, self.mmu.read_byte(self.registers.get_pc())),
+            0x0E => Instruction::Load(LoadRegister::C, self.mmu.read_byte(self.registers.get_pc())),
+            0x16 => Instruction::Load(LoadRegister::D, self.mmu.read_byte(self.registers.get_pc())),
+            0x1E => Instruction::Load(LoadRegister::E, self.mmu.read_byte(self.registers.get_pc())),
+            0x26 => Instruction::Load(LoadRegister::H, self.mmu.read_byte(self.registers.get_pc())),
+            0x2E => Instruction::Load(LoadRegister::L, self.mmu.read_byte(self.registers.get_pc())),
+            0x7F => Instruction::Load(LoadRegister::A, self.registers.get_a()),
+            0x78 => Instruction::Load(LoadRegister::A, self.registers.get_b()),
+            0x79 => Instruction::Load(LoadRegister::A, self.registers.get_c()),
+            0x7A => Instruction::Load(LoadRegister::A, self.registers.get_d()),
+            0x7B => Instruction::Load(LoadRegister::A, self.registers.get_e()),
+            0x7C => Instruction::Load(LoadRegister::A, self.registers.get_h()),
+            0x7D => Instruction::Load(LoadRegister::A, self.registers.get_l()),
+            0x7E => Instruction::Load(LoadRegister::A, self.mmu.read_byte(self.registers.get_hl())),
+
             0x87 => Instruction::Add8(self.registers.get_a()),
             0x80 => Instruction::Add8(self.registers.get_b()),
             0x81 => Instruction::Add8(self.registers.get_c()),
@@ -137,12 +147,13 @@ impl Cpu {
         match &instruction {
             Instruction::Load(target, value) => {
                 match target {
-                    LoadTarget::B => self.registers.set_b(*value),
-                    LoadTarget::C => self.registers.set_c(*value),
-                    LoadTarget::D => self.registers.set_d(*value),
-                    LoadTarget::E => self.registers.set_e(*value),
-                    LoadTarget::H => self.registers.set_h(*value),
-                    LoadTarget::L => self.registers.set_l(*value),
+                    LoadRegister::A => self.registers.set_a(*value),
+                    LoadRegister::B => self.registers.set_b(*value),
+                    LoadRegister::C => self.registers.set_c(*value),
+                    LoadRegister::D => self.registers.set_d(*value),
+                    LoadRegister::E => self.registers.set_e(*value),
+                    LoadRegister::H => self.registers.set_h(*value),
+                    LoadRegister::L => self.registers.set_l(*value),
                 }
             }
             Instruction::Add8(register_value) => self.add8(*register_value, false),
@@ -299,7 +310,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn cpu_load_test() {
+    fn cpu_load_immediate_test() {
         let mut cpu = Cpu::new();
         cpu.mmu.write_byte(cpu.registers.get_pc(), 0xE0);
         let load_b = cpu.decode_opcode(0x06);

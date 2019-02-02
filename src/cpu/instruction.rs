@@ -1,5 +1,5 @@
 pub enum Instruction {
-    Load(LoadTarget, u8),
+    Load(LoadRegister, u8),
     Add8(u8),
     Adc(u8),
     Sub(u8),
@@ -15,11 +15,11 @@ pub enum Instruction {
 }
 
 #[rustfmt::skip]
-pub enum LoadTarget {
-    B, C, D, E, H, L,
+pub enum IncDecTarget {
+    A, B, C, D, E, H, L, HL,
 }
 
 #[rustfmt::skip]
-pub enum IncDecTarget {
-    A, B, C, D, E, H, L, HL,
+pub enum LoadRegister {
+    A, B, C, D, E, H, L
 }
