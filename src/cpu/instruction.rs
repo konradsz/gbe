@@ -17,11 +17,11 @@ pub enum Instruction {
 }
 
 #[rustfmt::skip]
-pub enum IncDecTarget {
-    A, B, C, D, E, H, L, HL,
+pub enum LoadRegister {
+    A, B, C, D, E, H, L
 }
 
 #[rustfmt::skip]
-pub enum LoadRegister {
-    A, B, C, D, E, H, L
+pub enum IncDecTarget {
+    A, B, C, D, E, H, L, HL,
 }

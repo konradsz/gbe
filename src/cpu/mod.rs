@@ -47,6 +47,15 @@ impl Cpu {
             0x7C => Instruction::Load(LoadRegister::A, self.registers.get_h()),
             0x7D => Instruction::Load(LoadRegister::A, self.registers.get_l()),
             0x7E => Instruction::Load(LoadRegister::A, self.mmu.read_byte(self.registers.get_hl())),
+            0x0A => Instruction::Load(LoadRegister::A, self.mmu.read_byte(self.registers.get_bc())),
+            0x1A => Instruction::Load(LoadRegister::A, self.mmu.read_byte(self.registers.get_de())),
+            0xFA => {
+                let lsb = self.mmu.read_byte(self.registers.get_pc());
+                let msb = self.mmu.read_byte(self.registers.get_pc() + 1);
+                let address: u16 = u16::from(msb) << 8 | u16::from(lsb);
+                Instruction::Load(LoadRegister::A, self.mmu.read_byte(address))
+            }
+            0x3E => Instruction::Load(LoadRegister::A, self.mmu.read_byte(self.registers.get_pc())),
             0x40 => Instruction::Load(LoadRegister::B, self.registers.get_b()),
             0x41 => Instruction::Load(LoadRegister::B, self.registers.get_c()),
             0x42 => Instruction::Load(LoadRegister::B, self.registers.get_d()),
@@ -408,8 +417,9 @@ mod tests {
     fn cpu_load_registers_test() {
         let mut cpu = Cpu::new();
         const ADDRESS: u16 = 0xABCD;
-        cpu.mmu.write_byte(ADDRESS, 0xFF);
         cpu.registers.set_hl(ADDRESS);
+        cpu.registers.set_bc(ADDRESS);
+        cpu.registers.set_de(ADDRESS);
 
         // Load(A, A)
         cpu.registers.set_a(0xE0);
@@ -417,24 +427,49 @@ mod tests {
         cpu.execute_instruction(load_a_to_a);
         assert_eq!(cpu.registers.get_a(), 0xE0);
         // Load(A, HL)
-        let load_memory_to_a = cpu.decode_opcode(0x7E);
-        cpu.execute_instruction(load_memory_to_a);
-        assert_eq!(cpu.registers.get_a(), 0xFF);
+        cpu.mmu.write_byte(ADDRESS, 0xFA);
+        let load_memory_hl_to_a = cpu.decode_opcode(0x7E);
+        cpu.execute_instruction(load_memory_hl_to_a);
+        assert_eq!(cpu.registers.get_a(), 0xFA);
+        // Load(A, BC)
+        cpu.mmu.write_byte(ADDRESS, 0xFB);
+        let load_memory_bc_to_a = cpu.decode_opcode(0x0A);
+        cpu.execute_instruction(load_memory_bc_to_a);
+        assert_eq!(cpu.registers.get_a(), 0xFB);
+        // Load(A, DE)
+        cpu.mmu.write_byte(ADDRESS, 0xFC);
+        let load_memory_de_to_a = cpu.decode_opcode(0x1A);
+        cpu.execute_instruction(load_memory_de_to_a);
+        assert_eq!(cpu.registers.get_a(), 0xFC);
+        // Load(A, nn)
+        cpu.mmu.write_byte(ADDRESS, 0xFD);
+        cpu.mmu.write_byte(cpu.registers.get_pc(), 0xCD);
+        cpu.mmu.write_byte(cpu.registers.get_pc() + 1, 0xAB);
+        let load_bytes_to_a = cpu.decode_opcode(0xFA);
+        cpu.execute_instruction(load_bytes_to_a);
+        assert_eq!(cpu.registers.get_a(), 0xFD);
+        // Load(A, #)
+        cpu.mmu.write_byte(cpu.registers.get_pc(), 0xEA);
+        let load_memory_pc_to_a = cpu.decode_opcode(0x3E);
+        cpu.execute_instruction(load_memory_pc_to_a);
+        assert_eq!(cpu.registers.get_a(), 0xEA);
         // Load(B, B)
         cpu.registers.set_b(0xE1);
         let load_b_to_b = cpu.decode_opcode(0x40);
         cpu.execute_instruction(load_b_to_b);
         assert_eq!(cpu.registers.get_b(), 0xE1);
         // Load(B, HL)
+        cpu.mmu.write_byte(ADDRESS, 0xFE);
         let load_memory_to_b = cpu.decode_opcode(0x46);
         cpu.execute_instruction(load_memory_to_b);
-        assert_eq!(cpu.registers.get_b(), 0xFF);
+        assert_eq!(cpu.registers.get_b(), 0xFE);
         // Load(C, C)
         cpu.registers.set_c(0xE2);
         let load_c_to_c = cpu.decode_opcode(0x49);
         cpu.execute_instruction(load_c_to_c);
         assert_eq!(cpu.registers.get_c(), 0xE2);
         // Load(C, HL)
+        cpu.mmu.write_byte(ADDRESS, 0xFF);
         let load_memory_to_c = cpu.decode_opcode(0x4E);
         cpu.execute_instruction(load_memory_to_c);
         assert_eq!(cpu.registers.get_c(), 0xFF);
