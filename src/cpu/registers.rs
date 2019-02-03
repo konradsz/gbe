@@ -126,6 +126,18 @@ impl Registers {
         self.l = (value & 0xFF) as u8;
     }
 
+    pub fn increment_hl(&mut self) -> u16 {
+        let previous_hl = self.get_hl();
+        self.set_hl(previous_hl + 1);
+        previous_hl
+    }
+
+    pub fn decrement_hl(&mut self) -> u16 {
+        let previous_hl = self.get_hl();
+        self.set_hl(previous_hl - 1);
+        previous_hl
+    }
+
     pub fn set_z_flag(&mut self, state: bool) {
         self.f.z = state;
     }
@@ -150,8 +162,10 @@ impl Registers {
         self.pc
     }
 
-    pub fn increment_pc(&mut self) {
+    pub fn increment_pc(&mut self) -> u16 {
+        let previous_pc = self.pc;
         self.pc += 1;
+        previous_pc
     }
 
     pub fn get_sp(&self) -> u16 {
@@ -288,6 +302,12 @@ mod tests {
 
         registers.set_l(0xEF);
         assert_eq!(registers.get_hl(), 0xBEEF);
+
+        assert_eq!(registers.increment_hl(), 0xBEEF);
+        assert_eq!(registers.get_hl(), 0xBEF0);
+
+        assert_eq!(registers.decrement_hl(), 0xBEF0);
+        assert_eq!(registers.get_hl(), 0xBEEF);
     }
 
     #[test]
@@ -341,8 +361,7 @@ mod tests {
     #[test]
     fn register_pc() {
         let mut registers = Registers::new();
-        assert_eq!(registers.get_pc(), 0x0);
-        registers.increment_pc();
+        assert_eq!(registers.increment_pc(), 0x0);
         assert_eq!(registers.get_pc(), 0x1);
     }
 
