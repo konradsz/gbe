@@ -130,7 +130,8 @@ impl Cpu {
             0x21 => Instruction::Load16(LoadRegister16::HL, self.read_word()),
             0x31 => Instruction::Load16(LoadRegister16::SP, self.read_word()),
             0xF9 => Instruction::Load16(LoadRegister16::SP, self.registers.get_hl()),
-
+            0xF8 => Instruction::Load16(LoadRegister16::HL,
+                self.add_signed_byte_to_word(self.mmu.read_byte(self.registers.get_pc()) as i8, self.registers.get_sp())),
             0x87 => Instruction::Add8(self.registers.get_a()),
             0x80 => Instruction::Add8(self.registers.get_b()),
             0x81 => Instruction::Add8(self.registers.get_c()),
@@ -329,6 +330,23 @@ impl Cpu {
         self.registers.set_n_flag(false);
         self.registers.set_h_flag((((current_value & 0xf) + (new_value & 0xf)) & 0x10) == 0x10);
         self.registers.set_c_flag(overflowed);
+    }
+
+    fn add_signed_byte_to_word(&mut self, byte: i8, word: u16) -> u16 {
+        self.registers.set_z_flag(false);
+        self.registers.set_n_flag(false);
+
+        let abs_value = byte.abs() as u16;
+        if byte >= 0 {
+            self.registers.set_h_flag((word & 0xF) + (abs_value & 0xF) > 0xF);
+            self.registers.set_c_flag((word & 0xFF) + abs_value > 0xFF);
+            return word + abs_value;
+        } else {
+            let (result, overflowed) = word.overflowing_sub(abs_value);
+            self.registers.set_h_flag(abs_value & 0xF > word & 0xF);
+            self.registers.set_c_flag(overflowed);
+            return result;
+        }
     }
 
     fn sub(&mut self, mut value: u8, with_carry: bool) {
@@ -694,6 +712,41 @@ mod tests {
         cpu.execute_instruction(add_from_memory_pc_with_carry);
         assert_eq!(cpu.registers.get_a(), 0x0);
         assert_eq!(cpu.registers.get_f(), 0b1001_0000);
+    }
+
+    #[test]
+    fn cpu_add_signed_byte_to_word_test() {
+        let mut cpu = Cpu::new();
+        cpu.registers.set_f(0b1100_0000);
+
+        // positive byte
+        cpu.mmu.write_byte(cpu.registers.get_pc(), 0b0100_1000);
+        // load with half carry
+        cpu.registers.set_sp(0b0000_1111);
+        let ld_hl_sp_n = cpu.decode_opcode(0xF8);
+        cpu.execute_instruction(ld_hl_sp_n);
+        assert_eq!(cpu.registers.get_f(), 0b0010_0000);
+        assert_eq!(cpu.registers.get_hl(), 0b0100_1000 + 0b0000_1111);
+        // load with carry
+        cpu.registers.set_sp(0b1111_0000);
+        let ld_hl_sp_n = cpu.decode_opcode(0xF8);
+        cpu.execute_instruction(ld_hl_sp_n);
+        assert_eq!(cpu.registers.get_f(), 0b0001_0000);
+        assert_eq!(cpu.registers.get_hl(), 0b0100_1000 + 0b1111_0000);
+
+        // negative byte
+        cpu.mmu.write_byte(cpu.registers.get_pc(), 0b1100_1000);
+        // load with half carry
+        cpu.registers.set_sp(0b1000_0111);
+        let ld_hl_sp_n = cpu.decode_opcode(0xF8);
+        cpu.execute_instruction(ld_hl_sp_n);
+        assert_eq!(cpu.registers.get_f(), 0b0010_0000);
+        assert_eq!(cpu.registers.get_hl(), 0b1000_0111 - 56);
+        // load with carry
+        cpu.registers.set_sp(0b0000_1111);
+        let ld_hl_sp_n = cpu.decode_opcode(0xF8);
+        cpu.execute_instruction(ld_hl_sp_n);
+        assert_eq!(cpu.registers.get_f(), 0b0001_0000);
     }
 
     #[test]
