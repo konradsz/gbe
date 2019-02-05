@@ -29,6 +29,12 @@ impl Cpu {
         self.execute_instruction(instruction);
     }
 
+    fn read_word(&self) -> u16 {
+        let lsb = self.mmu.read_byte(self.registers.get_pc());
+        let msb = self.mmu.read_byte(self.registers.get_pc() + 1);
+        u16::from(msb) << 8 | u16::from(lsb)
+    }
+
     // move back to instruction.rs with cpu as argument (problem with decrement/increment hl)
     fn decode_opcode(&mut self, opcode: u8) -> Instruction {
         match opcode {
@@ -48,12 +54,7 @@ impl Cpu {
             0x7E => Instruction::Load(LoadRegister::A, self.mmu.read_byte(self.registers.get_hl())),
             0x0A => Instruction::Load(LoadRegister::A, self.mmu.read_byte(self.registers.get_bc())),
             0x1A => Instruction::Load(LoadRegister::A, self.mmu.read_byte(self.registers.get_de())),
-            0xFA => {
-                let lsb = self.mmu.read_byte(self.registers.get_pc());
-                let msb = self.mmu.read_byte(self.registers.get_pc() + 1);
-                let address: u16 = u16::from(msb) << 8 | u16::from(lsb);
-                Instruction::Load(LoadRegister::A, self.mmu.read_byte(address))
-            }
+            0xFA => Instruction::Load(LoadRegister::A, self.mmu.read_byte(self.read_word())),
             0x3E => Instruction::Load(LoadRegister::A, self.mmu.read_byte(self.registers.get_pc())),
             0x40 => Instruction::Load(LoadRegister::B, self.registers.get_b()),
             0x41 => Instruction::Load(LoadRegister::B, self.registers.get_c()),
@@ -113,12 +114,7 @@ impl Cpu {
             0x02 => Instruction::LoadToMemory(self.registers.get_bc(), LoadRegister::A),
             0x12 => Instruction::LoadToMemory(self.registers.get_de(), LoadRegister::A),
             0x77 => Instruction::LoadToMemory(self.registers.get_hl(), LoadRegister::A),
-            0xEA => {
-                let lsb = self.mmu.read_byte(self.registers.get_pc());
-                let msb = self.mmu.read_byte(self.registers.get_pc() + 1);
-                let address: u16 = u16::from(msb) << 8 | u16::from(lsb);
-                Instruction::LoadToMemory(address, LoadRegister::A)
-            }
+            0xEA => Instruction::LoadToMemory(self.read_word(), LoadRegister::A),
             0xF2 => Instruction::Load(LoadRegister::A, self.mmu.read_byte(0xFF00) + self.registers.get_c()),
             0xE2 => Instruction::LoadToMemory(0xFF00 + u16::from(self.registers.get_c()), LoadRegister::A),
 
@@ -128,6 +124,10 @@ impl Cpu {
             0x22 => Instruction::LoadToMemory(self.registers.increment_hl(), LoadRegister::A),
             0xE0 => Instruction::LoadToMemory(0xFF00 + u16::from(self.mmu.read_byte(self.registers.get_pc())), LoadRegister::A),
             0xF0 => Instruction::Load(LoadRegister::A, self.mmu.read_byte(0xFF00 + u16::from(self.mmu.read_byte(self.registers.get_pc())))),
+            0x01 => Instruction::Load16(LoadRegister16::BC, self.read_word()),
+            0x11 => Instruction::Load16(LoadRegister16::DE, self.read_word()),
+            0x21 => Instruction::Load16(LoadRegister16::HL, self.read_word()),
+            0x31 => Instruction::Load16(LoadRegister16::SP, self.read_word()),
 
             0x87 => Instruction::Add8(self.registers.get_a()),
             0x80 => Instruction::Add8(self.registers.get_b()),
@@ -249,6 +249,14 @@ impl Cpu {
                 }
             }
             Instruction::LoadToMemoryFromMemory(address, value) => self.mmu.write_byte(*address, *value),
+            Instruction::Load16(target, value) => {
+                match target {
+                    LoadRegister16::BC => self.registers.set_bc(*value),
+                    LoadRegister16::DE => self.registers.set_de(*value),
+                    LoadRegister16::HL => self.registers.set_hl(*value),
+                    LoadRegister16::SP => self.registers.set_sp(*value),
+                }
+            }
             Instruction::Add8(register_value) => self.add8(*register_value, false),
             Instruction::Adc(register_value) => self.add8(*register_value, true),
             Instruction::Sub(register_value) => self.sub(*register_value, false),
@@ -403,7 +411,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn cpu_load_immediate_test() {
+    fn cpu_load8_immediate_test() {
         let mut cpu = Cpu::new();
         cpu.mmu.write_byte(cpu.registers.get_pc(), 0xE0);
         let load_b = cpu.decode_opcode(0x06);
@@ -443,7 +451,7 @@ mod tests {
     }
 
     #[test]
-    fn cpu_load_registers_test() {
+    fn cpu_load8_registers_test() {
         let mut cpu = Cpu::new();
         const ADDRESS: u16 = 0xABCD;
         cpu.registers.set_hl(ADDRESS);
@@ -567,7 +575,7 @@ mod tests {
     }
 
     #[test]
-    fn cpu_load_to_memory_test() {
+    fn cpu_load8_to_memory_test() {
         let mut cpu = Cpu::new();
         const ADDRESS: u16 = 0xABCD;
         cpu.registers.set_bc(ADDRESS);
@@ -622,6 +630,30 @@ mod tests {
         let load_to_memory_0xff00_plus_n_from_a = cpu.decode_opcode(0xE0);
         cpu.execute_instruction(load_to_memory_0xff00_plus_n_from_a);
         assert_eq!(cpu.mmu.read_byte(0xFF00 + u16::from(cpu.mmu.read_byte(cpu.registers.get_pc()))), 0xEF);
+    }
+
+    #[test]
+    fn cpu_load16_immediate_test() {
+        let mut cpu = Cpu::new();
+        cpu.mmu.write_byte(cpu.registers.get_pc(), 0xCD);
+        cpu.mmu.write_byte(cpu.registers.get_pc() + 1, 0xAB);
+
+        // Load(BC, nn)
+        let load_to_bc = cpu.decode_opcode(0x01);
+        cpu.execute_instruction(load_to_bc);
+        assert_eq!(cpu.registers.get_bc(), 0xABCD);
+        // Load(DE, nn)
+        let load_to_de = cpu.decode_opcode(0x11);
+        cpu.execute_instruction(load_to_de);
+        assert_eq!(cpu.registers.get_de(), 0xABCD);
+        // Load(HL, nn)
+        let load_to_hl = cpu.decode_opcode(0x21);
+        cpu.execute_instruction(load_to_hl);
+        assert_eq!(cpu.registers.get_hl(), 0xABCD);
+        // Load(SP, nn)
+        let load_to_sp = cpu.decode_opcode(0x31);
+        cpu.execute_instruction(load_to_sp);
+        assert_eq!(cpu.registers.get_sp(), 0xABCD);
     }
 
     #[test]

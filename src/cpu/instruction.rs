@@ -2,6 +2,7 @@ pub enum Instruction {
     Load(LoadRegister, u8),
     LoadToMemory(u16, LoadRegister),
     LoadToMemoryFromMemory(u16, u8),
+    Load16(LoadRegister16, u16),
     Add8(u8),
     Adc(u8),
     Sub(u8),
@@ -19,6 +20,11 @@ pub enum Instruction {
 #[rustfmt::skip]
 pub enum LoadRegister {
     A, B, C, D, E, H, L
+}
+
+#[rustfmt::skip]
+pub enum LoadRegister16 {
+    BC, DE, HL, SP
 }
 
 #[rustfmt::skip]

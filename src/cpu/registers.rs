@@ -171,6 +171,10 @@ impl Registers {
     pub fn get_sp(&self) -> u16 {
         self.sp
     }
+
+    pub fn set_sp(&mut self, value: u16) {
+        self.sp = value;
+    }
 }
 
 impl FlagRegister {
@@ -367,7 +371,9 @@ mod tests {
 
     #[test]
     fn register_sp() {
-        let registers = Registers::new();
+        let mut registers = Registers::new();
         assert_eq!(registers.get_sp(), 0x0);
+        registers.set_sp(0xABCD);
+        assert_eq!(registers.get_sp(), 0xABCD);
     }
 }
