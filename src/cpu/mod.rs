@@ -126,6 +126,8 @@ impl Cpu {
             0x32 => Instruction::LoadToMemory(self.registers.decrement_hl(), LoadRegister::A),
             0x2A => Instruction::Load(LoadRegister::A, self.mmu.read_byte(self.registers.increment_hl())),
             0x22 => Instruction::LoadToMemory(self.registers.increment_hl(), LoadRegister::A),
+            0xE0 => Instruction::LoadToMemory(0xFF00 + u16::from(self.mmu.read_byte(self.registers.get_pc())), LoadRegister::A),
+            0xF0 => Instruction::Load(LoadRegister::A, self.mmu.read_byte(0xFF00 + u16::from(self.mmu.read_byte(self.registers.get_pc())))),
 
             0x87 => Instruction::Add8(self.registers.get_a()),
             0x80 => Instruction::Add8(self.registers.get_b()),
@@ -433,6 +435,11 @@ mod tests {
         assert_eq!(cpu.registers.get_e(), 0xE3);
         assert_eq!(cpu.registers.get_h(), 0xE4);
         assert_eq!(cpu.registers.get_l(), 0xE5);
+
+        cpu.mmu.write_byte(0xFF00 + u16::from(cpu.mmu.read_byte(cpu.registers.get_pc())), 0xE6);
+        let load_a = cpu.decode_opcode(0xF0);
+        cpu.execute_instruction(load_a);
+        assert_eq!(cpu.registers.get_a(), 0xE6);
     }
 
     #[test]
@@ -610,6 +617,11 @@ mod tests {
         let load_to_memory_0xff00_plus_c_from_a = cpu.decode_opcode(0xE2);
         cpu.execute_instruction(load_to_memory_0xff00_plus_c_from_a);
         assert_eq!(cpu.mmu.read_byte(0xFF00 + 0x1), 0xEA);
+        // Load((n), A)
+        cpu.registers.set_a(0xEF);
+        let load_to_memory_0xff00_plus_n_from_a = cpu.decode_opcode(0xE0);
+        cpu.execute_instruction(load_to_memory_0xff00_plus_n_from_a);
+        assert_eq!(cpu.mmu.read_byte(0xFF00 + u16::from(cpu.mmu.read_byte(cpu.registers.get_pc()))), 0xEF);
     }
 
     #[test]
