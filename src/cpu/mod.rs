@@ -37,6 +37,7 @@ impl Cpu {
 
     // move back to instruction.rs with cpu as argument (problem with decrement/increment hl)
     fn decode_opcode(&mut self, opcode: u8) -> Instruction {
+        // constant for 0xFF00 ?
         match opcode {
             0x06 => Instruction::Load(LoadRegister::B, self.mmu.read_byte(self.registers.get_pc())),
             0x0E => Instruction::Load(LoadRegister::C, self.mmu.read_byte(self.registers.get_pc())),
@@ -128,6 +129,7 @@ impl Cpu {
             0x11 => Instruction::Load16(LoadRegister16::DE, self.read_word()),
             0x21 => Instruction::Load16(LoadRegister16::HL, self.read_word()),
             0x31 => Instruction::Load16(LoadRegister16::SP, self.read_word()),
+            0xF9 => Instruction::Load16(LoadRegister16::SP, self.registers.get_hl()),
 
             0x87 => Instruction::Add8(self.registers.get_a()),
             0x80 => Instruction::Add8(self.registers.get_b()),
@@ -654,6 +656,11 @@ mod tests {
         let load_to_sp = cpu.decode_opcode(0x31);
         cpu.execute_instruction(load_to_sp);
         assert_eq!(cpu.registers.get_sp(), 0xABCD);
+        // Load(SP, HL)
+        cpu.registers.set_hl(0xDEAD);
+        let load_to_sp_from_hl = cpu.decode_opcode(0xF9);
+        cpu.execute_instruction(load_to_sp_from_hl);
+        assert_eq!(cpu.registers.get_sp(), 0xDEAD);
     }
 
     #[test]
