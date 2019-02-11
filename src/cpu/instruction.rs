@@ -2,7 +2,7 @@ pub enum Instruction {
     Load(LoadRegister, u8),
     LoadToMemory(u16, LoadRegister),
     LoadToMemoryFromMemory(u16, u8),
-    Load16(LoadRegister16, u16),
+    Load16(TargetRegister16, u16),
     LoadStackPointerToMemory(u16),
     PushStack(StackOperationRegisters),
     PopStack(StackOperationRegisters),
@@ -14,8 +14,10 @@ pub enum Instruction {
     Or(u8),
     Xor(u8),
     Cp(u8),
-    Inc(IncDecTarget),
-    Dec(IncDecTarget),
+    Inc8(IncDecTarget),
+    Dec8(IncDecTarget),
+    Inc16(TargetRegister16),
+    Dec16(TargetRegister16),
     AddHL(u16),
     Nop,
 }
@@ -26,7 +28,7 @@ pub enum LoadRegister {
 }
 
 #[rustfmt::skip]
-pub enum LoadRegister16 {
+pub enum TargetRegister16 {
     BC, DE, HL, SP
 }
 

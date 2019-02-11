@@ -125,12 +125,12 @@ impl Cpu {
             0x22 => Instruction::LoadToMemory(self.registers.increment_hl(), LoadRegister::A),
             0xE0 => Instruction::LoadToMemory(0xFF00 + u16::from(self.mmu.read_byte(self.registers.get_pc())), LoadRegister::A),
             0xF0 => Instruction::Load(LoadRegister::A, self.mmu.read_byte(0xFF00 + u16::from(self.mmu.read_byte(self.registers.get_pc())))),
-            0x01 => Instruction::Load16(LoadRegister16::BC, self.read_word()),
-            0x11 => Instruction::Load16(LoadRegister16::DE, self.read_word()),
-            0x21 => Instruction::Load16(LoadRegister16::HL, self.read_word()),
-            0x31 => Instruction::Load16(LoadRegister16::SP, self.read_word()),
-            0xF9 => Instruction::Load16(LoadRegister16::SP, self.registers.get_hl()),
-            0xF8 => Instruction::Load16(LoadRegister16::HL,
+            0x01 => Instruction::Load16(TargetRegister16::BC, self.read_word()),
+            0x11 => Instruction::Load16(TargetRegister16::DE, self.read_word()),
+            0x21 => Instruction::Load16(TargetRegister16::HL, self.read_word()),
+            0x31 => Instruction::Load16(TargetRegister16::SP, self.read_word()),
+            0xF9 => Instruction::Load16(TargetRegister16::SP, self.registers.get_hl()),
+            0xF8 => Instruction::Load16(TargetRegister16::HL,
                 self.add_signed_byte_to_word(self.mmu.read_byte(self.registers.get_pc()) as i8, self.registers.get_sp())),
             0x08 => Instruction::LoadStackPointerToMemory(self.read_word()),
 
@@ -214,29 +214,38 @@ impl Cpu {
             0xBD => Instruction::Cp(self.registers.get_l()),
             0xBE => Instruction::Cp(self.mmu.read_byte(self.registers.get_hl())),
             0xFE => Instruction::Cp(self.mmu.read_byte(self.registers.get_pc())),
-            0x3C => Instruction::Inc(IncDecTarget::A),
-            0x04 => Instruction::Inc(IncDecTarget::B),
-            0x0C => Instruction::Inc(IncDecTarget::C),
-            0x14 => Instruction::Inc(IncDecTarget::D),
-            0x1C => Instruction::Inc(IncDecTarget::E),
-            0x24 => Instruction::Inc(IncDecTarget::H),
-            0x2C => Instruction::Inc(IncDecTarget::L),
-            0x34 => Instruction::Inc(IncDecTarget::HL),
-            0x3D => Instruction::Dec(IncDecTarget::A),
-            0x05 => Instruction::Dec(IncDecTarget::B),
-            0x0D => Instruction::Dec(IncDecTarget::C),
-            0x15 => Instruction::Dec(IncDecTarget::D),
-            0x1D => Instruction::Dec(IncDecTarget::E),
-            0x25 => Instruction::Dec(IncDecTarget::H),
-            0x2D => Instruction::Dec(IncDecTarget::L),
-            0x35 => Instruction::Dec(IncDecTarget::HL),
+            0x3C => Instruction::Inc8(IncDecTarget::A),
+            0x04 => Instruction::Inc8(IncDecTarget::B),
+            0x0C => Instruction::Inc8(IncDecTarget::C),
+            0x14 => Instruction::Inc8(IncDecTarget::D),
+            0x1C => Instruction::Inc8(IncDecTarget::E),
+            0x24 => Instruction::Inc8(IncDecTarget::H),
+            0x2C => Instruction::Inc8(IncDecTarget::L),
+            0x34 => Instruction::Inc8(IncDecTarget::HL),
+            0x3D => Instruction::Dec8(IncDecTarget::A),
+            0x05 => Instruction::Dec8(IncDecTarget::B),
+            0x0D => Instruction::Dec8(IncDecTarget::C),
+            0x15 => Instruction::Dec8(IncDecTarget::D),
+            0x1D => Instruction::Dec8(IncDecTarget::E),
+            0x25 => Instruction::Dec8(IncDecTarget::H),
+            0x2D => Instruction::Dec8(IncDecTarget::L),
+            0x35 => Instruction::Dec8(IncDecTarget::HL),
+            0x13 => Instruction::Inc16(TargetRegister16::DE),
+            0x03 => Instruction::Inc16(TargetRegister16::BC),
+            0x23 => Instruction::Inc16(TargetRegister16::HL),
+            0x33 => Instruction::Inc16(TargetRegister16::SP),
+            0x0B => Instruction::Dec16(TargetRegister16::BC),
+            0x1B => Instruction::Dec16(TargetRegister16::DE),
+            0x2B => Instruction::Dec16(TargetRegister16::HL),
+            0x3B => Instruction::Dec16(TargetRegister16::SP),
             0x09 => Instruction::AddHL(self.registers.get_bc()),
             0x19 => Instruction::AddHL(self.registers.get_de()),
             0x29 => Instruction::AddHL(self.registers.get_hl()),
             0x39 => Instruction::AddHL(self.registers.get_sp()),
-            0xE8 => Instruction::Load16(LoadRegister16::SP,
+            0xE8 => Instruction::Load16(TargetRegister16::SP,
                 self.add_signed_byte_to_word(self.mmu.read_byte(self.registers.get_pc()) as i8, self.registers.get_sp())),
-            _ => Instruction::Nop
+            //_ => Instruction::Nop
+            _ => panic!("unknown opcode {}", opcode)
         }
     }
 
@@ -267,10 +276,10 @@ impl Cpu {
             Instruction::LoadToMemoryFromMemory(address, value) => self.mmu.write_byte(*address, *value),
             Instruction::Load16(target, value) => {
                 match target {
-                    LoadRegister16::BC => self.registers.set_bc(*value),
-                    LoadRegister16::DE => self.registers.set_de(*value),
-                    LoadRegister16::HL => self.registers.set_hl(*value),
-                    LoadRegister16::SP => self.registers.set_sp(*value),
+                    TargetRegister16::BC => self.registers.set_bc(*value),
+                    TargetRegister16::DE => self.registers.set_de(*value),
+                    TargetRegister16::HL => self.registers.set_hl(*value),
+                    TargetRegister16::SP => self.registers.set_sp(*value),
                 }
             }
             Instruction::LoadStackPointerToMemory(address) => {
@@ -304,11 +313,11 @@ impl Cpu {
             Instruction::Or(register_value) => self.or(*register_value),
             Instruction::Xor(register_value) => self.xor(*register_value),
             Instruction::Cp(register_value) => self.compare(*register_value),
-            Instruction::Inc(target) | Instruction::Dec(target) => {
+            Instruction::Inc8(target) | Instruction::Dec8(target) => {
                 let perform_operation = |cpu: &mut Cpu, instruction: &Instruction, value| -> u8 {
                     match instruction {
-                        Instruction::Inc(_) => cpu.increment(value),
-                        Instruction::Dec(_) => cpu.decrement(value),
+                        Instruction::Inc8(_) => cpu.increment(value),
+                        Instruction::Dec8(_) => cpu.decrement(value),
                         _ => 0,
                     }
                 };
@@ -350,6 +359,34 @@ impl Cpu {
                     }
                 }
             }
+            Instruction::Inc16(target) | Instruction::Dec16(target) => {
+                let perform_operation = |instruction: &Instruction, value: u16| -> u16 {
+                    match instruction {
+                        Instruction::Inc16(_) => value + 1,
+                        Instruction::Dec16(_) => value - 1,
+                        _ => 0,
+                    }
+                };
+
+                match target {
+                    TargetRegister16::BC => {
+                        let value = perform_operation(&instruction, self.registers.get_bc());
+                        self.registers.set_bc(value);
+                    }
+                    TargetRegister16::DE => {
+                        let value = perform_operation(&instruction, self.registers.get_de());
+                        self.registers.set_de(value);
+                    }
+                    TargetRegister16::HL => {
+                        let value = perform_operation(&instruction, self.registers.get_hl());
+                        self.registers.set_hl(value);
+                    }
+                    TargetRegister16::SP => {
+                        let value = perform_operation(&instruction, self.registers.get_sp());
+                        self.registers.set_sp(value);
+                    }
+                }
+            },
             Instruction::AddHL(register_value) => self.add16(*register_value),
             Instruction::Nop => (),
         }
@@ -1045,17 +1082,19 @@ mod tests {
     }
 
     #[test]
-    fn cpu_increment_test() {
+    fn cpu_increment8_test() {
         let mut cpu = Cpu::new();
         cpu.registers.set_b(0xF);
         cpu.registers.set_f(0b1101_0000);
-        cpu.execute_instruction(Instruction::Inc(IncDecTarget::B));
+        let inc_b = cpu.decode_opcode(0x04);
+        cpu.execute_instruction(inc_b);
         assert_eq!(cpu.registers.get_b(), 0x10);
         assert_eq!(cpu.registers.get_f(), 0b0011_0000);
 
         // check that zero flag is set
         cpu.registers.set_c(u8::max_value());
-        cpu.execute_instruction(Instruction::Inc(IncDecTarget::C));
+        let inc_c = cpu.decode_opcode(0x0C);
+        cpu.execute_instruction(inc_c);
         assert_eq!(cpu.registers.get_c(), 0x0);
         assert_eq!(cpu.registers.get_f(), 0b1011_0000);
 
@@ -1063,28 +1102,31 @@ mod tests {
         const VALUE: u8 = 0x1F;
         cpu.mmu.write_byte(ADDRESS, VALUE);
         cpu.registers.set_hl(ADDRESS);
-        cpu.execute_instruction(Instruction::Inc(IncDecTarget::HL));
+        let inc_hl = cpu.decode_opcode(0x34);
+        cpu.execute_instruction(inc_hl);
         assert_eq!(cpu.mmu.read_byte(ADDRESS), VALUE + 1);
     }
 
     #[test]
-    fn cpu_decrement_test() {
+    fn cpu_decrement8_test() {
         let mut cpu = Cpu::new();
         cpu.registers.set_a(0xF);
         cpu.registers.set_f(0b1011_0000);
-        cpu.execute_instruction(Instruction::Dec(IncDecTarget::A));
+        cpu.execute_instruction(Instruction::Dec8(IncDecTarget::A));
         assert_eq!(cpu.registers.get_a(), 0xE);
         assert_eq!(cpu.registers.get_f(), 0b0101_0000);
 
         // check that zero flag is set
         cpu.registers.set_b(0x1);
-        cpu.execute_instruction(Instruction::Dec(IncDecTarget::B));
+        let dec_b = cpu.decode_opcode(0x05);
+        cpu.execute_instruction(dec_b);
         assert_eq!(cpu.registers.get_b(), 0x0);
         assert_eq!(cpu.registers.get_f(), 0b1101_0000);
 
         // check that half carry flag is set
         cpu.registers.set_c(0b10000);
-        cpu.execute_instruction(Instruction::Dec(IncDecTarget::C));
+        let dec_c = cpu.decode_opcode(0x0D);
+        cpu.execute_instruction(dec_c);
         assert_eq!(cpu.registers.get_c(), 0b1111);
         assert_eq!(cpu.registers.get_f(), 0b0111_0000);
 
@@ -1092,8 +1134,47 @@ mod tests {
         const VALUE: u8 = 0x1F;
         cpu.mmu.write_byte(ADDRESS, VALUE);
         cpu.registers.set_hl(ADDRESS);
-        cpu.execute_instruction(Instruction::Dec(IncDecTarget::HL));
+        let dec_hl = cpu.decode_opcode(0x35);
+        cpu.execute_instruction(dec_hl);
         assert_eq!(cpu.mmu.read_byte(ADDRESS), VALUE - 1);
+    }
+
+    #[test]
+    fn cpu_increment16_decrement16_test() {
+        const INITIAL_REGISTER_VALUE: u16 = 0xDEAD;
+        let mut cpu = Cpu::new();
+        cpu.registers.set_bc(INITIAL_REGISTER_VALUE);
+        cpu.registers.set_de(INITIAL_REGISTER_VALUE);
+        cpu.registers.set_hl(INITIAL_REGISTER_VALUE);
+        cpu.registers.set_sp(INITIAL_REGISTER_VALUE);
+
+        let increment_bc = cpu.decode_opcode(0x03);
+        cpu.execute_instruction(increment_bc);
+        assert_eq!(cpu.registers.get_bc(), INITIAL_REGISTER_VALUE + 1);
+        let decrement_bc = cpu.decode_opcode(0x0B);
+        cpu.execute_instruction(decrement_bc);
+        assert_eq!(cpu.registers.get_bc(), INITIAL_REGISTER_VALUE);
+
+        let increment_de = cpu.decode_opcode(0x13);
+        cpu.execute_instruction(increment_de);
+        assert_eq!(cpu.registers.get_de(), INITIAL_REGISTER_VALUE + 1);
+        let decrement_de = cpu.decode_opcode(0x1B);
+        cpu.execute_instruction(decrement_de);
+        assert_eq!(cpu.registers.get_de(), INITIAL_REGISTER_VALUE);
+
+        let increment_hl = cpu.decode_opcode(0x23);
+        cpu.execute_instruction(increment_hl);
+        assert_eq!(cpu.registers.get_hl(), INITIAL_REGISTER_VALUE + 1);
+        let decrement_hl = cpu.decode_opcode(0x2B);
+        cpu.execute_instruction(decrement_hl);
+        assert_eq!(cpu.registers.get_hl(), INITIAL_REGISTER_VALUE);
+
+        let increment_sp = cpu.decode_opcode(0x33);
+        cpu.execute_instruction(increment_sp);
+        assert_eq!(cpu.registers.get_sp(), INITIAL_REGISTER_VALUE + 1);
+        let decrement_sp = cpu.decode_opcode(0x3B);
+        cpu.execute_instruction(decrement_sp);
+        assert_eq!(cpu.registers.get_hl(), INITIAL_REGISTER_VALUE);
     }
 
     #[test]
