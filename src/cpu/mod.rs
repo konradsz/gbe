@@ -133,6 +133,16 @@ impl Cpu {
             0xF8 => Instruction::Load16(LoadRegister16::HL,
                 self.add_signed_byte_to_word(self.mmu.read_byte(self.registers.get_pc()) as i8, self.registers.get_sp())),
             0x08 => Instruction::LoadStackPointerToMemory(self.read_word()),
+
+            0xF5 => Instruction::PushStack(StackOperationRegisters::AF),
+            0xC5 => Instruction::PushStack(StackOperationRegisters::BC),
+            0xD5 => Instruction::PushStack(StackOperationRegisters::DE),
+            0xE5 => Instruction::PushStack(StackOperationRegisters::HL),
+            0xF1 => Instruction::PopStack(StackOperationRegisters::AF),
+            0xC1 => Instruction::PopStack(StackOperationRegisters::BC),
+            0xD1 => Instruction::PopStack(StackOperationRegisters::DE),
+            0xE1 => Instruction::PopStack(StackOperationRegisters::HL),
+
             0x87 => Instruction::Add8(self.registers.get_a()),
             0x80 => Instruction::Add8(self.registers.get_b()),
             0x81 => Instruction::Add8(self.registers.get_c()),
@@ -267,6 +277,23 @@ impl Cpu {
                 self.mmu.write_byte(*address, sp_lsb);
                 self.mmu.write_byte(*address + 1, sp_msb);
             }
+            Instruction::PushStack(register) => {
+                match register {
+                    StackOperationRegisters::AF => self.push(self.registers.get_af()),
+                    StackOperationRegisters::BC => self.push(self.registers.get_bc()),
+                    StackOperationRegisters::DE => self.push(self.registers.get_de()),
+                    StackOperationRegisters::HL => self.push(self.registers.get_hl()),
+                }
+            }
+            Instruction::PopStack(register) => {
+                let value = self.pop();
+                match register {
+                    StackOperationRegisters::AF => self.registers.set_af(value),
+                    StackOperationRegisters::BC => self.registers.set_bc(value),
+                    StackOperationRegisters::DE => self.registers.set_de(value),
+                    StackOperationRegisters::HL => self.registers.set_hl(value),
+                }
+            }
             Instruction::Add8(register_value) => self.add8(*register_value, false),
             Instruction::Adc(register_value) => self.add8(*register_value, true),
             Instruction::Sub(register_value) => self.sub(*register_value, false),
@@ -324,6 +351,24 @@ impl Cpu {
             Instruction::AddHL(register_value) => self.add16(*register_value),
             Instruction::Nop => (),
         }
+    }
+
+    fn push(&mut self, value: u16) {
+        let lsb = (value & 0x00FF) as u8;
+        let msb = (value >> 8) as u8;
+
+        self.registers.decrement_sp();
+        self.mmu.write_byte(self.registers.get_sp(), msb);
+        self.registers.decrement_sp();
+        self.mmu.write_byte(self.registers.get_sp(), lsb);
+    }
+
+    fn pop(&mut self) -> u16 {
+        let lsb = self.mmu.read_byte(self.registers.get_sp());
+        self.registers.increment_sp();
+        let msb = self.mmu.read_byte(self.registers.get_sp());
+        self.registers.increment_sp();
+        u16::from(msb) << 8 | u16::from(lsb)
     }
 
     fn add8(&mut self, mut value: u8, with_carry: bool) {
@@ -697,7 +742,54 @@ mod tests {
         cpu.execute_instruction(load_sp_to_memory);
 
         assert_eq!(cpu.mmu.read_byte(cpu.registers.get_pc()), 0xCD);
-        assert_eq!(cpu.mmu.read_byte(cpu.registers.get_pc() + 1), 0xAB);
+        assert_eq!(cpu.mmu.read_byte(cpu.registers.get_pc()), 0xCD);
+    }
+
+    #[test]
+    fn cpu_stack_push_pop_test() {
+        const INITIAL_SP: u16 = 0xFFFE;
+        let mut cpu = Cpu::new();
+        cpu.registers.set_sp(INITIAL_SP);
+        cpu.registers.set_af(0x8890);
+        cpu.registers.set_bc(0xAABB);
+        cpu.registers.set_de(0xCCDD);
+        cpu.registers.set_hl(0xEEFF);
+
+        let push_af_on_stack = cpu.decode_opcode(0xF5);
+        let pop_stack_to_af = cpu.decode_opcode(0xF1);
+        cpu.execute_instruction(push_af_on_stack);
+        assert_eq!(cpu.registers.get_sp(), INITIAL_SP - 2);
+        cpu.registers.set_af(0x0);
+        cpu.execute_instruction(pop_stack_to_af);
+        assert_eq!(cpu.registers.get_sp(), INITIAL_SP);
+        assert_eq!(cpu.registers.get_af(), 0x8890);
+
+        let push_bc_on_stack = cpu.decode_opcode(0xC5);
+        let pop_stack_to_bc = cpu.decode_opcode(0xC1);
+        cpu.execute_instruction(push_bc_on_stack);
+        assert_eq!(cpu.registers.get_sp(), INITIAL_SP - 2);
+        cpu.registers.set_bc(0x0);
+        cpu.execute_instruction(pop_stack_to_bc);
+        assert_eq!(cpu.registers.get_sp(), INITIAL_SP);
+        assert_eq!(cpu.registers.get_bc(), 0xAABB);
+
+        let push_de_on_stack = cpu.decode_opcode(0xD5);
+        let pop_stack_to_de = cpu.decode_opcode(0xD1);
+        cpu.execute_instruction(push_de_on_stack);
+        assert_eq!(cpu.registers.get_sp(), INITIAL_SP - 2);
+        cpu.registers.set_de(0x0);
+        cpu.execute_instruction(pop_stack_to_de);
+        assert_eq!(cpu.registers.get_sp(), INITIAL_SP);
+        assert_eq!(cpu.registers.get_de(), 0xCCDD);
+
+        let push_hl_on_stack = cpu.decode_opcode(0xE5);
+        let pop_stack_to_hl = cpu.decode_opcode(0xE1);
+        cpu.execute_instruction(push_hl_on_stack);
+        assert_eq!(cpu.registers.get_sp(), INITIAL_SP - 2);
+        cpu.registers.set_hl(0x0);
+        cpu.execute_instruction(pop_stack_to_hl);
+        assert_eq!(cpu.registers.get_sp(), INITIAL_SP);
+        assert_eq!(cpu.registers.get_hl(), 0xEEFF);
     }
 
     #[test]

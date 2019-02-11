@@ -184,6 +184,14 @@ impl Registers {
     pub fn set_sp(&mut self, value: u16) {
         self.sp = value;
     }
+
+    pub fn decrement_sp(&mut self) {
+        self.sp -= 1;
+    }
+
+    pub fn increment_sp(&mut self) {
+        self.sp += 1;
+    }
 }
 
 impl FlagRegister {
@@ -405,6 +413,11 @@ mod tests {
         let mut registers = Registers::new();
         assert_eq!(registers.get_sp(), 0x0);
         registers.set_sp(0xABCD);
+        assert_eq!(registers.get_sp(), 0xABCD);
+
+        registers.decrement_sp();
+        assert_eq!(registers.get_sp(), 0xABCC);
+        registers.increment_sp();
         assert_eq!(registers.get_sp(), 0xABCD);
     }
 }
