@@ -234,6 +234,8 @@ impl Cpu {
             0x19 => Instruction::AddHL(self.registers.get_de()),
             0x29 => Instruction::AddHL(self.registers.get_hl()),
             0x39 => Instruction::AddHL(self.registers.get_sp()),
+            0xE8 => Instruction::Load16(LoadRegister16::SP,
+                self.add_signed_byte_to_word(self.mmu.read_byte(self.registers.get_pc()) as i8, self.registers.get_sp())),
             _ => Instruction::Nop
         }
     }
@@ -858,6 +860,13 @@ mod tests {
         let ld_hl_sp_n = cpu.decode_opcode(0xF8);
         cpu.execute_instruction(ld_hl_sp_n);
         assert_eq!(cpu.registers.get_f(), 0b0001_0000);
+
+        cpu.mmu.write_byte(cpu.registers.get_pc(), 0b0001_1000);
+        let add_n_to_sp = cpu.decode_opcode(0xE8);
+        let sp = cpu.registers.get_sp();
+        let n = u16::from(cpu.mmu.read_byte(cpu.registers.get_pc()));
+        cpu.execute_instruction(add_n_to_sp);
+        assert_eq!(cpu.registers.get_sp(), sp + n);
     }
 
     #[test]
