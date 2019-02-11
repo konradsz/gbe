@@ -99,6 +99,15 @@ impl Registers {
         self.f = FlagRegister::from(value);
     }
 
+    pub fn get_af(&self) -> u16 {
+        u16::from(self.a) << 8 | u16::from(u8::from(self.f))
+    }
+
+    pub fn set_af(&mut self, value: u16) {
+        self.a = (value >> 8) as u8;
+        self.f = FlagRegister::from((value & 0xFF) as u8);
+    }
+
     pub fn get_bc(&self) -> u16 {
         u16::from(self.b) << 8 | u16::from(self.c)
     }
@@ -264,6 +273,28 @@ mod tests {
         assert_eq!(registers.get_l(), 0x0);
         registers.set_l(BYTE);
         assert_eq!(registers.get_l(), BYTE);
+    }
+
+    #[test]
+    fn register_af() {
+        let mut registers = Registers::new();
+        assert_eq!(registers.get_af(), 0x0);
+        registers.set_af(0b0101_1010_1001_1111);
+        assert_eq!(registers.get_af(), 0b0101_1010_1001_0000); // lower 4 bits are ignored
+
+        registers.set_a(0b1010_0101);
+        assert_eq!(registers.get_af(), 0b1010_0101_1001_0000);
+        registers.set_f(0b1111_1111); // lower 4 bits are ignored
+        assert_eq!(registers.get_af(), 0b1010_0101_1111_0000);
+
+        registers.set_z_flag(false);
+        assert_eq!(registers.get_af(), 0b1010_0101_0111_0000);
+        registers.set_n_flag(false);
+        assert_eq!(registers.get_af(), 0b1010_0101_0011_0000);
+        registers.set_h_flag(false);
+        assert_eq!(registers.get_af(), 0b1010_0101_0001_0000);
+        registers.set_c_flag(false);
+        assert_eq!(registers.get_af(), 0b1010_0101_0000_0000);
     }
 
     #[test]
