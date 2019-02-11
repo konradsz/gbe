@@ -162,7 +162,7 @@ impl Registers {
         self.pc
     }
 
-    pub fn increment_pc(&mut self) -> u16 {
+    pub fn get_and_increment_pc(&mut self) -> u16 {
         let previous_pc = self.pc;
         self.pc += 1;
         previous_pc
@@ -365,7 +365,7 @@ mod tests {
     #[test]
     fn register_pc() {
         let mut registers = Registers::new();
-        assert_eq!(registers.increment_pc(), 0x0);
+        assert_eq!(registers.get_and_increment_pc(), 0x0);
         assert_eq!(registers.get_pc(), 0x1);
     }
 

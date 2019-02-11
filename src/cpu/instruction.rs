@@ -3,6 +3,7 @@ pub enum Instruction {
     LoadToMemory(u16, LoadRegister),
     LoadToMemoryFromMemory(u16, u8),
     Load16(LoadRegister16, u16),
+    LoadStackPointerToMemory(u16),
     Add8(u8),
     Adc(u8),
     Sub(u8),

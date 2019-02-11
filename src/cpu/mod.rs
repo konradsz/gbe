@@ -18,7 +18,7 @@ impl Cpu {
     }
 
     fn step(&mut self) {
-        let opcode = self.mmu.read_byte(self.registers.increment_pc());
+        let opcode = self.mmu.read_byte(self.registers.get_and_increment_pc());
 
         let instruction;
         if opcode == 0xCB {
@@ -132,6 +132,7 @@ impl Cpu {
             0xF9 => Instruction::Load16(LoadRegister16::SP, self.registers.get_hl()),
             0xF8 => Instruction::Load16(LoadRegister16::HL,
                 self.add_signed_byte_to_word(self.mmu.read_byte(self.registers.get_pc()) as i8, self.registers.get_sp())),
+            0x08 => Instruction::LoadStackPointerToMemory(self.read_word()),
             0x87 => Instruction::Add8(self.registers.get_a()),
             0x80 => Instruction::Add8(self.registers.get_b()),
             0x81 => Instruction::Add8(self.registers.get_c()),
@@ -259,6 +260,12 @@ impl Cpu {
                     LoadRegister16::HL => self.registers.set_hl(*value),
                     LoadRegister16::SP => self.registers.set_sp(*value),
                 }
+            }
+            Instruction::LoadStackPointerToMemory(address) => {
+                let sp_lsb = (self.registers.get_sp() & 0x00FF) as u8;
+                let sp_msb = (self.registers.get_sp() >> 8) as u8;
+                self.mmu.write_byte(*address, sp_lsb);
+                self.mmu.write_byte(*address + 1, sp_msb);
             }
             Instruction::Add8(register_value) => self.add8(*register_value, false),
             Instruction::Adc(register_value) => self.add8(*register_value, true),
@@ -679,6 +686,18 @@ mod tests {
         let load_to_sp_from_hl = cpu.decode_opcode(0xF9);
         cpu.execute_instruction(load_to_sp_from_hl);
         assert_eq!(cpu.registers.get_sp(), 0xDEAD);
+    }
+
+    #[test]
+    fn cpu_load_stack_pointer_to_memory_test() {
+        let mut cpu = Cpu::new();
+        cpu.registers.set_sp(0xABCD);
+
+        let load_sp_to_memory = cpu.decode_opcode(0x08);
+        cpu.execute_instruction(load_sp_to_memory);
+
+        assert_eq!(cpu.mmu.read_byte(cpu.registers.get_pc()), 0xCD);
+        assert_eq!(cpu.mmu.read_byte(cpu.registers.get_pc() + 1), 0xAB);
     }
 
     #[test]
