@@ -22,7 +22,8 @@ impl Cpu {
 
         let instruction;
         if opcode == 0xCB {
-            panic!("Prefixed instructions not implemented");
+            let prefixed_opcode = self.mmu.read_byte(self.registers.get_and_increment_pc());
+            instruction = self.decode_prefixed_opcode(prefixed_opcode);
         } else {
             instruction = self.decode_opcode(opcode);
         }
@@ -249,6 +250,20 @@ impl Cpu {
         }
     }
 
+    fn decode_prefixed_opcode(&mut self, opcode: u8) -> Instruction {
+        match opcode {
+            0x37 => Instruction::Swap(IncDecTarget::A),
+            0x30 => Instruction::Swap(IncDecTarget::B),
+            0x31 => Instruction::Swap(IncDecTarget::C),
+            0x32 => Instruction::Swap(IncDecTarget::D),
+            0x33 => Instruction::Swap(IncDecTarget::E),
+            0x34 => Instruction::Swap(IncDecTarget::H),
+            0x35 => Instruction::Swap(IncDecTarget::L),
+            0x36 => Instruction::Swap(IncDecTarget::HL),
+            _ => panic!("unknown opcode {}", opcode)
+        }
+    }
+
     fn execute_instruction(&mut self, instruction: Instruction) {
         match &instruction {
             Instruction::Load(target, value) => {
@@ -388,6 +403,50 @@ impl Cpu {
                 }
             },
             Instruction::AddHL(register_value) => self.add16(*register_value),
+            Instruction::Swap(target) => {
+                match target {
+                    IncDecTarget::A => {
+                        let mut value = self.registers.get_a();
+                        value = self.swap(value);
+                        self.registers.set_a(value);
+                    }
+                    IncDecTarget::B => {
+                        let mut value = self.registers.get_b();
+                        value = self.swap(value);
+                        self.registers.set_b(value);
+                    }
+                    IncDecTarget::C => {
+                        let mut value = self.registers.get_c();
+                        value = self.swap(value);
+                        self.registers.set_c(value);
+                    }
+                    IncDecTarget::D => {
+                        let mut value = self.registers.get_d();
+                        value = self.swap(value);
+                        self.registers.set_d(value);
+                    }
+                    IncDecTarget::E => {
+                        let mut value = self.registers.get_e();
+                        value = self.swap(value);
+                        self.registers.set_e(value);
+                    }
+                    IncDecTarget::H => {
+                        let mut value = self.registers.get_h();
+                        value = self.swap(value);
+                        self.registers.set_h(value);
+                    }
+                    IncDecTarget::L => {
+                        let mut value = self.registers.get_l();
+                        value = self.swap(value);
+                        self.registers.set_l(value);
+                    }
+                    IncDecTarget::HL => {
+                        let mut value = self.mmu.read_byte(self.registers.get_hl());
+                        value = self.swap(value);
+                        self.mmu.write_byte(self.registers.get_hl(), value);
+                    }
+                }
+            }
             Instruction::Nop => (),
         }
     }
@@ -514,6 +573,17 @@ impl Cpu {
         self.registers.set_h_flag(overflowed);
         self.registers
             .set_c_flag((current_value & 0xFFF) + (value & 0xFFF) > 0xFFF);
+    }
+
+    fn swap(&mut self, value: u8) -> u8 {
+        let lower_nibble = value & 0x0F;
+        let upper_nibble = value >> 4;
+        let result = lower_nibble << 4 | upper_nibble;
+        self.registers.set_z_flag(result == 0);
+        self.registers.set_n_flag(false);
+        self.registers.set_h_flag(false);
+        self.registers.set_c_flag(false);
+        result
     }
 }
 
@@ -1197,5 +1267,38 @@ mod tests {
         cpu.execute_instruction(add_hl);
         assert_eq!(cpu.registers.get_hl(), overflowed_value);
         assert_eq!(cpu.registers.get_f(), 0b1011_0000);
+    }
+
+    #[test]
+    fn cpu_swap_test() {
+        const ADDRESS: u16 = 0xABCD;
+        let mut cpu = Cpu::new();
+
+        cpu.registers.set_a(0b0);
+        cpu.registers.set_b(0b1111_0000);
+        cpu.registers.set_c(0b1001_0110);
+        cpu.registers.set_f(0b1111_0000);
+        cpu.mmu.write_byte(ADDRESS, 0b1100_0011);
+        cpu.registers.set_hl(ADDRESS);
+
+        let swap_a = cpu.decode_prefixed_opcode(0x37);
+        cpu.execute_instruction(swap_a);
+        assert_eq!(cpu.registers.get_a(), 0b0000_0000);
+        assert_eq!(cpu.registers.get_f(), 0b1000_0000);
+
+        let swap_b = cpu.decode_prefixed_opcode(0x30);
+        cpu.execute_instruction(swap_b);
+        assert_eq!(cpu.registers.get_b(), 0b0000_1111);
+        assert_eq!(cpu.registers.get_f(), 0b0000_0000);
+
+        let swap_c = cpu.decode_prefixed_opcode(0x31);
+        cpu.execute_instruction(swap_c);
+        assert_eq!(cpu.registers.get_c(), 0b0110_1001);
+        assert_eq!(cpu.registers.get_f(), 0b0000_0000);
+
+        let swap_hl  = cpu.decode_prefixed_opcode(0x36);
+        cpu.execute_instruction(swap_hl);
+        assert_eq!(cpu.mmu.read_byte(cpu.registers.get_hl()), 0b0011_1100);
+        assert_eq!(cpu.registers.get_f(), 0b0000_0000);
     }
 }

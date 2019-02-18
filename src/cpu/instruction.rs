@@ -19,6 +19,7 @@ pub enum Instruction {
     Inc16(TargetRegister16),
     Dec16(TargetRegister16),
     AddHL(u16),
+    Swap(IncDecTarget),
     Nop,
 }
 
@@ -37,6 +38,8 @@ pub enum StackOperationRegisters {
     AF, BC, DE, HL
 }
 
+
+// rename, used also in Swap
 #[rustfmt::skip]
 pub enum IncDecTarget {
     A, B, C, D, E, H, L, HL,
