@@ -245,6 +245,8 @@ impl Cpu {
             0x39 => Instruction::AddHL(self.registers.get_sp()),
             0xE8 => Instruction::Load16(TargetRegister16::SP,
                 self.add_signed_byte_to_word(self.mmu.read_byte(self.registers.get_pc()) as i8, self.registers.get_sp())),
+            0x27 => panic!("DAA instruction not implemented"),
+            0x2F => Instruction::ComplementA,
             //_ => Instruction::Nop
             _ => panic!("unknown opcode {}", opcode)
         }
@@ -446,7 +448,8 @@ impl Cpu {
                         self.mmu.write_byte(self.registers.get_hl(), value);
                     }
                 }
-            }
+            },
+            Instruction::ComplementA => self.complement_a(),
             Instruction::Nop => (),
         }
     }
@@ -584,6 +587,13 @@ impl Cpu {
         self.registers.set_h_flag(false);
         self.registers.set_c_flag(false);
         result
+    }
+
+    fn complement_a(&mut self) {
+        let mut value = self.registers.get_a();
+        self.registers.set_a(!value);
+        self.registers.set_n_flag(true);
+        self.registers.set_h_flag(true);
     }
 }
 
@@ -1300,5 +1310,18 @@ mod tests {
         cpu.execute_instruction(swap_hl);
         assert_eq!(cpu.mmu.read_byte(cpu.registers.get_hl()), 0b0011_1100);
         assert_eq!(cpu.registers.get_f(), 0b0000_0000);
+    }
+
+    #[test]
+    fn cpu_complement_a_test() {
+        let mut cpu = Cpu::new();
+        cpu.registers.set_a(0b1001_0110);
+        cpu.registers.set_f(0b1001_0000);
+
+        let complement_a = cpu.decode_opcode(0x2F);
+        cpu.execute_instruction(complement_a);
+
+        assert_eq!(cpu.registers.get_a(), 0b0110_1001);
+        assert_eq!(cpu.registers.get_f(), 0b1111_0000);
     }
 }
