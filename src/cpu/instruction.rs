@@ -26,6 +26,7 @@ pub enum Instruction {
     Rlca,
     Rla,
     Rrca,
+    Rra,
     Nop,
 }
 
