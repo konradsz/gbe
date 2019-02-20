@@ -20,14 +20,14 @@ pub enum Instruction {
     Dec16(TargetRegister16),
     AddHL(u16),
     Swap(IncDecTarget),
-    ComplementA,
-    ComplementCarryFlag,
-    SetCarryFlag,
-    Rlca,
-    Rla,
-    Rrca,
-    Rra,
+    ComplementA, // rename
+    ComplementCarryFlag, // rename
+    SetCarryFlag, // rename
     Nop,
+    Rlc(IncDecTarget),
+    Rl(IncDecTarget),
+    Rrc(IncDecTarget),
+    Rr(IncDecTarget),
 }
 
 #[rustfmt::skip]
@@ -46,7 +46,7 @@ pub enum StackOperationRegisters {
 }
 
 
-// rename, used also in Swap
+// rename, used also in Swap, RLC, RL, RRC, RR
 #[rustfmt::skip]
 pub enum IncDecTarget {
     A, B, C, D, E, H, L, HL,

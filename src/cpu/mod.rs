@@ -254,10 +254,10 @@ impl Cpu {
             0x10 => panic!("STOP instruction not implemented"),
             0xF3 => panic!("DI instruction not implemented"),
             0xFB => panic!("EI instruction not implemented"),
-            0x07 => Instruction::Rlca,
-            0x17 => Instruction::Rla,
-            0x0F => Instruction::Rrca,
-            0x1F => Instruction::Rra,
+            0x07 => Instruction::Rlc(IncDecTarget::A),
+            0x17 => Instruction::Rl(IncDecTarget::A),
+            0x0F => Instruction::Rrc(IncDecTarget::A),
+            0x1F => Instruction::Rr(IncDecTarget::A),
             _ => panic!("unknown opcode {}", opcode)
         }
     }
@@ -272,6 +272,38 @@ impl Cpu {
             0x34 => Instruction::Swap(IncDecTarget::H),
             0x35 => Instruction::Swap(IncDecTarget::L),
             0x36 => Instruction::Swap(IncDecTarget::HL),
+            0x07 => Instruction::Rlc(IncDecTarget::A),
+            0x00 => Instruction::Rlc(IncDecTarget::B),
+            0x01 => Instruction::Rlc(IncDecTarget::C),
+            0x02 => Instruction::Rlc(IncDecTarget::D),
+            0x03 => Instruction::Rlc(IncDecTarget::E),
+            0x04 => Instruction::Rlc(IncDecTarget::H),
+            0x05 => Instruction::Rlc(IncDecTarget::L),
+            0x06 => Instruction::Rlc(IncDecTarget::HL),
+            0x17 => Instruction::Rl(IncDecTarget::A),
+            0x10 => Instruction::Rl(IncDecTarget::B),
+            0x11 => Instruction::Rl(IncDecTarget::C),
+            0x12 => Instruction::Rl(IncDecTarget::D),
+            0x13 => Instruction::Rl(IncDecTarget::E),
+            0x14 => Instruction::Rl(IncDecTarget::H),
+            0x15 => Instruction::Rl(IncDecTarget::L),
+            0x16 => Instruction::Rl(IncDecTarget::HL),
+            0x0F => Instruction::Rrc(IncDecTarget::A),
+            0x08 => Instruction::Rrc(IncDecTarget::B),
+            0x09 => Instruction::Rrc(IncDecTarget::C),
+            0x0A => Instruction::Rrc(IncDecTarget::D),
+            0x0B => Instruction::Rrc(IncDecTarget::E),
+            0x0C => Instruction::Rrc(IncDecTarget::H),
+            0x0D => Instruction::Rrc(IncDecTarget::L),
+            0x0E => Instruction::Rrc(IncDecTarget::HL),
+            0x1F => Instruction::Rr(IncDecTarget::A),
+            0x18 => Instruction::Rr(IncDecTarget::B),
+            0x19 => Instruction::Rr(IncDecTarget::C),
+            0x1A => Instruction::Rr(IncDecTarget::D),
+            0x1B => Instruction::Rr(IncDecTarget::E),
+            0x1C => Instruction::Rr(IncDecTarget::H),
+            0x1D => Instruction::Rr(IncDecTarget::L),
+            0x1E => Instruction::Rr(IncDecTarget::HL),
             _ => panic!("unknown opcode {}", opcode)
         }
     }
@@ -418,43 +450,35 @@ impl Cpu {
             Instruction::Swap(target) => {
                 match target {
                     IncDecTarget::A => {
-                        let mut value = self.registers.get_a();
-                        value = self.swap(value);
+                        let value = self.swap(self.registers.get_a());
                         self.registers.set_a(value);
                     }
                     IncDecTarget::B => {
-                        let mut value = self.registers.get_b();
-                        value = self.swap(value);
+                        let value = self.swap(self.registers.get_b());
                         self.registers.set_b(value);
                     }
                     IncDecTarget::C => {
-                        let mut value = self.registers.get_c();
-                        value = self.swap(value);
+                        let value = self.swap(self.registers.get_c());
                         self.registers.set_c(value);
                     }
                     IncDecTarget::D => {
-                        let mut value = self.registers.get_d();
-                        value = self.swap(value);
+                        let value = self.swap(self.registers.get_d());
                         self.registers.set_d(value);
                     }
                     IncDecTarget::E => {
-                        let mut value = self.registers.get_e();
-                        value = self.swap(value);
+                        let value = self.swap(self.registers.get_e());
                         self.registers.set_e(value);
                     }
                     IncDecTarget::H => {
-                        let mut value = self.registers.get_h();
-                        value = self.swap(value);
+                        let value = self.swap(self.registers.get_h());
                         self.registers.set_h(value);
                     }
                     IncDecTarget::L => {
-                        let mut value = self.registers.get_l();
-                        value = self.swap(value);
+                        let value = self.swap(self.registers.get_l());
                         self.registers.set_l(value);
                     }
                     IncDecTarget::HL => {
-                        let mut value = self.mmu.read_byte(self.registers.get_hl());
-                        value = self.swap(value);
+                        let value = self.swap(self.mmu.read_byte(self.registers.get_hl()));
                         self.mmu.write_byte(self.registers.get_hl(), value);
                     }
                 }
@@ -467,10 +491,150 @@ impl Cpu {
                 self.registers.set_c_flag(true);
             }
             Instruction::Nop => (),
-            Instruction::Rlca => self.rlca(),
-            Instruction::Rla => self.rla(),
-            Instruction::Rrca => self.rrca(),
-            Instruction::Rra => self.rra(),
+            Instruction::Rlc(target) => {
+                match target {
+                    IncDecTarget::A => {
+                        let value = self.rlc(self.registers.get_a());
+                        self.registers.set_a(value);
+                    }
+                    IncDecTarget::B => {
+                        let value = self.rlc(self.registers.get_b());
+                        self.registers.set_b(value);
+                    }
+                    IncDecTarget::C => {
+                        let value = self.rlc(self.registers.get_c());
+                        self.registers.set_c(value);
+                    }
+                    IncDecTarget::D => {
+                        let value = self.rlc(self.registers.get_d());
+                        self.registers.set_d(value);
+                    }
+                    IncDecTarget::E => {
+                        let value = self.rlc(self.registers.get_e());
+                        self.registers.set_e(value);
+                    }
+                    IncDecTarget::H => {
+                        let value = self.rlc(self.registers.get_h());
+                        self.registers.set_h(value);
+                    }
+                    IncDecTarget::L => {
+                        let value = self.rlc(self.registers.get_l());
+                        self.registers.set_l(value);
+                    }
+                    IncDecTarget::HL => {
+                        let value = self.rlc(self.mmu.read_byte(self.registers.get_hl()));
+                        self.mmu.write_byte(self.registers.get_hl(), value);
+                    }
+                }
+            }
+            Instruction::Rl(target) => {
+                match target {
+                    IncDecTarget::A => {
+                        let value = self.rl(self.registers.get_a());
+                        self.registers.set_a(value);
+                    }
+                    IncDecTarget::B => {
+                        let value = self.rl(self.registers.get_b());
+                        self.registers.set_b(value);
+                    }
+                    IncDecTarget::C => {
+                        let value = self.rl(self.registers.get_c());
+                        self.registers.set_c(value);
+                    }
+                    IncDecTarget::D => {
+                        let value = self.rl(self.registers.get_d());
+                        self.registers.set_d(value);
+                    }
+                    IncDecTarget::E => {
+                        let value = self.rl(self.registers.get_e());
+                        self.registers.set_e(value);
+                    }
+                    IncDecTarget::H => {
+                        let value = self.rl(self.registers.get_h());
+                        self.registers.set_h(value);
+                    }
+                    IncDecTarget::L => {
+                        let value = self.rl(self.registers.get_l());
+                        self.registers.set_l(value);
+                    }
+                    IncDecTarget::HL => {
+                        let value = self.rl(self.mmu.read_byte(self.registers.get_hl()));
+                        self.mmu.write_byte(self.registers.get_hl(), value);
+                    }
+                }
+            }
+            Instruction::Rrc(target) => {
+                match target {
+                    IncDecTarget::A => {
+                        let value = self.rrc(self.registers.get_a());
+                        self.registers.set_a(value);
+                    }
+                    IncDecTarget::B => {
+                        let value = self.rrc(self.registers.get_b());
+                        self.registers.set_b(value);
+                    }
+                    IncDecTarget::C => {
+                        let value = self.rrc(self.registers.get_c());
+                        self.registers.set_c(value);
+                    }
+                    IncDecTarget::D => {
+                        let value = self.rrc(self.registers.get_d());
+                        self.registers.set_d(value);
+                    }
+                    IncDecTarget::E => {
+                        let value = self.rrc(self.registers.get_e());
+                        self.registers.set_e(value);
+                    }
+                    IncDecTarget::H => {
+                        let value = self.rrc(self.registers.get_h());
+                        self.registers.set_h(value);
+                    }
+                    IncDecTarget::L => {
+                        let value = self.rrc(self.registers.get_l());
+                        self.registers.set_l(value);
+                    }
+                    IncDecTarget::HL => {
+                        let value = self.rrc(self.mmu.read_byte(self.registers.get_hl()));
+                        self.mmu.write_byte(self.registers.get_hl(), value);
+                    }
+                }
+            }
+            Instruction::Rr(target) => {
+                match target {
+                    IncDecTarget::A => {
+                        let value = self.rr(self.registers.get_a());
+                        self.registers.set_a(value);
+                    }
+                    IncDecTarget::B => {
+                        let value = self.rr(self.registers.get_b());
+                        self.registers.set_b(value);
+                    }
+                    IncDecTarget::C => {
+                        let value = self.rr(self.registers.get_c());
+                        self.registers.set_c(value);
+                    }
+                    IncDecTarget::D => {
+                        let value = self.rr(self.registers.get_d());
+                        self.registers.set_d(value);
+                    }
+                    IncDecTarget::E => {
+                        let value = self.rr(self.registers.get_e());
+                        self.registers.set_e(value);
+                    }
+                    IncDecTarget::H => {
+                        let value = self.rr(self.registers.get_h());
+                        self.registers.set_h(value);
+                    }
+                    IncDecTarget::L => {
+                        let value = self.rr(self.registers.get_l());
+                        self.registers.set_l(value);
+                    }
+                    IncDecTarget::HL => {
+                        let value = self.rr(self.mmu.read_byte(self.registers.get_hl()));
+                        self.mmu.write_byte(self.registers.get_hl(), value);
+                    }
+                }
+            }
         }
     }
 
@@ -623,49 +787,48 @@ impl Cpu {
         self.registers.set_h_flag(false);
     }
 
-    fn rlca(&mut self) {
-        let register_a = self.registers.get_a();
-        let c = register_a >> 7;
-        let result = register_a << 1 | c;
-        self.registers.set_a(result);
-        self.registers.set_z_flag(result == 0); // some suggests it should be false always
+    fn rlc(&mut self, value: u8) -> u8 {
+        let c = value >> 7;
+        let result = value << 1 | c;
+        self.registers.set_z_flag(result == 0); // some says it should be false always (for A ?)
         self.registers.set_n_flag(false);
         self.registers.set_h_flag(false);
         self.registers.set_c_flag(c != 0);
+        result
     }
 
-    fn rla(&mut self) {
-        let register_a = self.registers.get_a();
+    fn rl(&mut self, value: u8) -> u8 {
         let c = u8::from(self.registers.get_c_flag());
-        let result = register_a << 1 | c;
+        let result = value << 1 | c;
         self.registers.set_a(result);
-        self.registers.set_z_flag(result == 0); // some suggests it should be false always
+        self.registers.set_z_flag(result == 0); // some says it should be false always (for A ?)
         self.registers.set_n_flag(false);
         self.registers.set_h_flag(false);
-        self.registers.set_c_flag((register_a >> 7) != 0);
+        self.registers.set_c_flag((value >> 7) != 0);
+        result
     }
 
-    fn rrca(&mut self) {
-        let register_a = self.registers.get_a();
-        let c: u8 = register_a & 1;
-        let result = c << 7 | register_a >> 1;
+    fn rrc(&mut self, value: u8) -> u8 {
+        let c: u8 = value & 1;
+        let result = c << 7 | value >> 1;
 
         self.registers.set_a(result);
-        self.registers.set_z_flag(result == 0); // some suggests it should be false always
+        self.registers.set_z_flag(result == 0); // some says it should be false always (for A ?)
         self.registers.set_n_flag(false);
         self.registers.set_h_flag(false);
         self.registers.set_c_flag(c != 0);
+        result
     }
 
-    fn rra(&mut self) {
-        let register_a = self.registers.get_a();
+    fn rr(&mut self, value: u8) -> u8 {
         let c = u8::from(self.registers.get_c_flag());
-        let result = c << 7 | register_a >> 1;
+        let result = c << 7 | value >> 1;
         self.registers.set_a(result);
-        self.registers.set_z_flag(result == 0); // some suggests it should be false always
+        self.registers.set_z_flag(result == 0); // some says it should be false always (for A ?)
         self.registers.set_n_flag(false);
         self.registers.set_h_flag(false);
-        self.registers.set_c_flag((register_a & 1) != 0);
+        self.registers.set_c_flag((value & 1) != 0);
+        result
     }
 }
 
@@ -1428,7 +1591,7 @@ mod tests {
     }
 
     #[test]
-    fn cpu_rlca_test() {
+    fn cpu_rlc_test() {
         let mut cpu = Cpu::new();
 
         cpu.registers.set_a(0b1100_0011);
@@ -1440,7 +1603,7 @@ mod tests {
 
         cpu.registers.set_a(0b0111_0000);
         cpu.registers.set_f(0b0001_0000);
-        let rlca = cpu.decode_opcode(0x07);
+        let rlca = cpu.decode_prefixed_opcode(0x07);
         cpu.execute_instruction(rlca);
         assert_eq!(cpu.registers.get_a(), 0b1110_0000);
         assert_eq!(cpu.registers.get_f(), 0b0000_0000);
@@ -1451,10 +1614,19 @@ mod tests {
         cpu.execute_instruction(rlca);
         assert_eq!(cpu.registers.get_a(), 0b0000_0000);
         assert_eq!(cpu.registers.get_f(), 0b1000_0000);
+
+        const ADDRESS: u16 = 0xABCD;
+        cpu.mmu.write_byte(ADDRESS, 0b0011_1100);
+        cpu.registers.set_hl(ADDRESS);
+        cpu.registers.set_f(0b0001_0000);
+        let rlchl = cpu.decode_prefixed_opcode(0x06);
+        cpu.execute_instruction(rlchl);
+        assert_eq!(cpu.mmu.read_byte(cpu.registers.get_hl()), 0b0111_1000);
+        assert_eq!(cpu.registers.get_f(), 0b0000_0000);
     }
 
     #[test]
-    fn cpu_rla_test() {
+    fn cpu_rl_test() {
         let mut cpu = Cpu::new();
 
         cpu.registers.set_a(0b1100_0011);
@@ -1466,7 +1638,7 @@ mod tests {
 
         cpu.registers.set_a(0b0100_0011);
         cpu.registers.set_f(0b0001_0000);
-        let rla = cpu.decode_opcode(0x17);
+        let rla = cpu.decode_prefixed_opcode(0x17);
         cpu.execute_instruction(rla);
         assert_eq!(cpu.registers.get_a(), 0b1000_0111);
         assert_eq!(cpu.registers.get_f(), 0b0000_0000);
@@ -1477,10 +1649,19 @@ mod tests {
         cpu.execute_instruction(rla);
         assert_eq!(cpu.registers.get_a(), 0b0000_0000);
         assert_eq!(cpu.registers.get_f(), 0b1000_0000);
+
+        const ADDRESS: u16 = 0xABCD;
+        cpu.mmu.write_byte(ADDRESS, 0b0011_1100);
+        cpu.registers.set_hl(ADDRESS);
+        cpu.registers.set_f(0b0001_0000);
+        let rlhl = cpu.decode_prefixed_opcode(0x16);
+        cpu.execute_instruction(rlhl);
+        assert_eq!(cpu.mmu.read_byte(cpu.registers.get_hl()), 0b011_11001);
+        assert_eq!(cpu.registers.get_f(), 0b0000_0000);
     }
 
     #[test]
-    fn cpu_rrca_test() {
+    fn cpu_rrc_test() {
         let mut cpu = Cpu::new();
 
         cpu.registers.set_a(0b1100_0011);
@@ -1492,7 +1673,7 @@ mod tests {
 
         cpu.registers.set_a(0b1100_0010);
         cpu.registers.set_f(0b0001_0000);
-        let rrca = cpu.decode_opcode(0x0F);
+        let rrca = cpu.decode_prefixed_opcode(0x0F);
         cpu.execute_instruction(rrca);
         assert_eq!(cpu.registers.get_a(), 0b0110_0001);
         assert_eq!(cpu.registers.get_f(), 0b0000_0000);
@@ -1503,10 +1684,19 @@ mod tests {
         cpu.execute_instruction(rrca);
         assert_eq!(cpu.registers.get_a(), 0b0000_0000);
         assert_eq!(cpu.registers.get_f(), 0b1000_0000);
+
+        const ADDRESS: u16 = 0xABCD;
+        cpu.mmu.write_byte(ADDRESS, 0b0011_1100);
+        cpu.registers.set_hl(ADDRESS);
+        cpu.registers.set_f(0b0001_0000);
+        let rrchl = cpu.decode_prefixed_opcode(0x0E);
+        cpu.execute_instruction(rrchl);
+        assert_eq!(cpu.mmu.read_byte(cpu.registers.get_hl()), 0b0001_1110);
+        assert_eq!(cpu.registers.get_f(), 0b0000_0000);
     }
 
     #[test]
-    fn cpu_rra_test() {
+    fn cpu_rr_test() {
         let mut cpu = Cpu::new();
 
         cpu.registers.set_a(0b1100_0011);
@@ -1518,7 +1708,7 @@ mod tests {
 
         cpu.registers.set_a(0b1100_0010);
         cpu.registers.set_f(0b0001_0000);
-        let rra = cpu.decode_opcode(0x1F);
+        let rra = cpu.decode_prefixed_opcode(0x1F);
         cpu.execute_instruction(rra);
         assert_eq!(cpu.registers.get_a(), 0b1110_0001);
         assert_eq!(cpu.registers.get_f(), 0b0000_0000);
@@ -1529,5 +1719,14 @@ mod tests {
         cpu.execute_instruction(rra);
         assert_eq!(cpu.registers.get_a(), 0b0000_0000);
         assert_eq!(cpu.registers.get_f(), 0b1000_0000);
+
+        const ADDRESS: u16 = 0xABCD;
+        cpu.mmu.write_byte(ADDRESS, 0b0011_1100);
+        cpu.registers.set_hl(ADDRESS);
+        cpu.registers.set_f(0b0001_0000);
+        let rrchl = cpu.decode_prefixed_opcode(0x0E);
+        cpu.execute_instruction(rrchl);
+        assert_eq!(cpu.mmu.read_byte(cpu.registers.get_hl()), 0b0001_1110);
+        assert_eq!(cpu.registers.get_f(), 0b0000_0000);
     }
 }
