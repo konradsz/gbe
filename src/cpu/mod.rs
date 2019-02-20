@@ -255,6 +255,7 @@ impl Cpu {
             0xF3 => panic!("DI instruction not implemented"),
             0xFB => panic!("EI instruction not implemented"),
             0x07 => Instruction::Rlca,
+            0x17 => Instruction::Rla,
             _ => panic!("unknown opcode {}", opcode)
         }
     }
@@ -465,6 +466,7 @@ impl Cpu {
             }
             Instruction::Nop => (),
             Instruction::Rlca => self.rlca(),
+            Instruction::Rla => self.rla(),
         }
     }
 
@@ -621,11 +623,22 @@ impl Cpu {
         let register_a = self.registers.get_a();
         let c = register_a >> 7;
         let result = register_a << 1 | c;
-        self.registers.set_a(register_a << 1 | c);
+        self.registers.set_a(result);
         self.registers.set_z_flag(result == 0); // some suggests it should be false always
         self.registers.set_n_flag(false);
         self.registers.set_h_flag(false);
         self.registers.set_c_flag(c != 0);
+    }
+
+    fn rla(&mut self) {
+        let register_a = self.registers.get_a();
+        let c = u8::from(self.registers.get_c_flag());
+        let result = register_a << 1 | c;
+        self.registers.set_a(result);
+        self.registers.set_z_flag(result == 0); // some suggests it should be false always
+        self.registers.set_n_flag(false);
+        self.registers.set_h_flag(false);
+        self.registers.set_c_flag((register_a >> 7) != 0);
     }
 }
 
@@ -1409,6 +1422,32 @@ mod tests {
         cpu.registers.set_f(0b1111_0000);
         let rlca = cpu.decode_opcode(0x07);
         cpu.execute_instruction(rlca);
+        assert_eq!(cpu.registers.get_a(), 0b0000_0000);
+        assert_eq!(cpu.registers.get_f(), 0b1000_0000);
+    }
+
+    #[test]
+    fn cpu_rla_test() {
+        let mut cpu = Cpu::new();
+
+        cpu.registers.set_a(0b1100_0011);
+        cpu.registers.set_f(0b1110_0000);
+        let rla = cpu.decode_opcode(0x17);
+        cpu.execute_instruction(rla);
+        assert_eq!(cpu.registers.get_a(), 0b1000_0110);
+        assert_eq!(cpu.registers.get_f(), 0b0001_0000);
+
+        cpu.registers.set_a(0b0100_0011);
+        cpu.registers.set_f(0b0001_0000);
+        let rla = cpu.decode_opcode(0x17);
+        cpu.execute_instruction(rla);
+        assert_eq!(cpu.registers.get_a(), 0b1000_0111);
+        assert_eq!(cpu.registers.get_f(), 0b0000_0000);
+
+        cpu.registers.set_a(0b0000_0000);
+        cpu.registers.set_f(0b1110_0000);
+        let rla = cpu.decode_opcode(0x17);
+        cpu.execute_instruction(rla);
         assert_eq!(cpu.registers.get_a(), 0b0000_0000);
         assert_eq!(cpu.registers.get_f(), 0b1000_0000);
     }

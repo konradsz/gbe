@@ -24,6 +24,7 @@ pub enum Instruction {
     ComplementCarryFlag,
     SetCarryFlag,
     Rlca,
+    Rla,
     Nop,
 }
 
