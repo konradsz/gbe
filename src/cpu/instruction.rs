@@ -25,6 +25,7 @@ pub enum Instruction {
     SetCarryFlag,
     Rlca,
     Rla,
+    Rrca,
     Nop,
 }
 
