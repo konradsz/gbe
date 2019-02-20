@@ -23,6 +23,7 @@ pub enum Instruction {
     ComplementA,
     ComplementCarryFlag,
     SetCarryFlag,
+    Rlca,
     Nop,
 }
 
