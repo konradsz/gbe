@@ -22,6 +22,7 @@ pub enum Instruction {
     Swap(IncDecTarget),
     ComplementA,
     ComplementCarryFlag,
+    SetCarryFlag,
     Nop,
 }
 

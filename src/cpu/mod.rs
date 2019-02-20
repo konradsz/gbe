@@ -248,6 +248,7 @@ impl Cpu {
             0x27 => panic!("DAA instruction not implemented"),
             0x2F => Instruction::ComplementA,
             0x3F => Instruction::ComplementCarryFlag,
+            0x37 => Instruction::SetCarryFlag,
             //_ => Instruction::Nop
             _ => panic!("unknown opcode {}", opcode)
         }
@@ -452,6 +453,11 @@ impl Cpu {
             },
             Instruction::ComplementA => self.complement_a(),
             Instruction::ComplementCarryFlag => self.complement_carry_flag(),
+            Instruction::SetCarryFlag => {
+                self.registers.set_n_flag(false);
+                self.registers.set_h_flag(false);
+                self.registers.set_c_flag(true);
+            }
             Instruction::Nop => (),
         }
     }
@@ -1341,11 +1347,26 @@ mod tests {
         cpu.registers.set_f(0b1000_0000);
         let complement_carry_flag = cpu.decode_opcode(0x3F);
         cpu.execute_instruction(complement_carry_flag);
+        assert_eq!(cpu.registers.get_f(), 0b1001_0000);
 
         cpu.registers.set_f(0b0111_0000);
         let complement_carry_flag = cpu.decode_opcode(0x3F);
         cpu.execute_instruction(complement_carry_flag);
-
         assert_eq!(cpu.registers.get_f(), 0b0000_0000);
+    }
+
+    #[test]
+    fn cpu_set_carry_flag_test() {
+        let mut cpu = Cpu::new();
+
+        cpu.registers.set_f(0b1110_0000);
+        let set_carry_flag = cpu.decode_opcode(0x37);
+        cpu.execute_instruction(set_carry_flag);
+        assert_eq!(cpu.registers.get_f(), 0b1001_0000);
+
+        cpu.registers.set_f(0b0001_0000);
+        let set_carry_flag = cpu.decode_opcode(0x37);
+        cpu.execute_instruction(set_carry_flag);
+        assert_eq!(cpu.registers.get_f(), 0b0001_0000);
     }
 }
