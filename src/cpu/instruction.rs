@@ -20,9 +20,9 @@ pub enum Instruction {
     Dec16(TargetRegister16),
     AddHL(u16),
     Swap(IncDecTarget),
-    ComplementA, // rename
-    ComplementCarryFlag, // rename
-    SetCarryFlag, // rename
+    Cpl,
+    Ccf,
+    Scf,
     Nop,
     Rlc(IncDecTarget),
     Rl(IncDecTarget),

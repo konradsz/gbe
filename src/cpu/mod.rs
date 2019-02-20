@@ -246,9 +246,9 @@ impl Cpu {
             0xE8 => Instruction::Load16(TargetRegister16::SP,
                 self.add_signed_byte_to_word(self.mmu.read_byte(self.registers.get_pc()) as i8, self.registers.get_sp())),
             0x27 => panic!("DAA instruction not implemented"),
-            0x2F => Instruction::ComplementA,
-            0x3F => Instruction::ComplementCarryFlag,
-            0x37 => Instruction::SetCarryFlag,
+            0x2F => Instruction::Cpl,
+            0x3F => Instruction::Ccf,
+            0x37 => Instruction::Scf,
             0x00 => Instruction::Nop,
             0x76 => panic!("HALT instruction not implemented"),
             0x10 => panic!("STOP instruction not implemented"),
@@ -458,9 +458,9 @@ impl Cpu {
                 }
             },
             Instruction::AddHL(register_value) => self.add16(*register_value),
-            Instruction::ComplementA => self.complement_a(),
-            Instruction::ComplementCarryFlag => self.complement_carry_flag(),
-            Instruction::SetCarryFlag => {
+            Instruction::Cpl => self.complement_a(),
+            Instruction::Ccf => self.complement_carry_flag(),
+            Instruction::Scf => {
                 self.registers.set_n_flag(false);
                 self.registers.set_h_flag(false);
                 self.registers.set_c_flag(true);
