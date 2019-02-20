@@ -372,11 +372,22 @@ impl Cpu {
             Instruction::Or(register_value) => self.or(*register_value),
             Instruction::Xor(register_value) => self.xor(*register_value),
             Instruction::Cp(register_value) => self.compare(*register_value),
-            Instruction::Inc8(target) | Instruction::Dec8(target) => {
+            Instruction::Inc8(target)
+                | Instruction::Dec8(target)
+                | Instruction::Swap(target)
+                | Instruction::Rlc(target)
+                | Instruction::Rl(target)
+                | Instruction::Rrc(target)
+                | Instruction::Rr(target) => {
                 let perform_operation = |cpu: &mut Cpu, instruction: &Instruction, value| -> u8 {
                     match instruction {
                         Instruction::Inc8(_) => cpu.increment(value),
                         Instruction::Dec8(_) => cpu.decrement(value),
+                        Instruction::Swap(_) => cpu.swap(value),
+                        Instruction::Rlc(_) => cpu.rlc(value),
+                        Instruction::Rl(_) => cpu.rl(value),
+                        Instruction::Rrc(_) => cpu.rrc(value),
+                        Instruction::Rr(_) => cpu.rr(value),
                         _ => 0,
                     }
                 };
@@ -447,42 +458,6 @@ impl Cpu {
                 }
             },
             Instruction::AddHL(register_value) => self.add16(*register_value),
-            Instruction::Swap(target) => {
-                match target {
-                    IncDecTarget::A => {
-                        let value = self.swap(self.registers.get_a());
-                        self.registers.set_a(value);
-                    }
-                    IncDecTarget::B => {
-                        let value = self.swap(self.registers.get_b());
-                        self.registers.set_b(value);
-                    }
-                    IncDecTarget::C => {
-                        let value = self.swap(self.registers.get_c());
-                        self.registers.set_c(value);
-                    }
-                    IncDecTarget::D => {
-                        let value = self.swap(self.registers.get_d());
-                        self.registers.set_d(value);
-                    }
-                    IncDecTarget::E => {
-                        let value = self.swap(self.registers.get_e());
-                        self.registers.set_e(value);
-                    }
-                    IncDecTarget::H => {
-                        let value = self.swap(self.registers.get_h());
-                        self.registers.set_h(value);
-                    }
-                    IncDecTarget::L => {
-                        let value = self.swap(self.registers.get_l());
-                        self.registers.set_l(value);
-                    }
-                    IncDecTarget::HL => {
-                        let value = self.swap(self.mmu.read_byte(self.registers.get_hl()));
-                        self.mmu.write_byte(self.registers.get_hl(), value);
-                    }
-                }
-            },
             Instruction::ComplementA => self.complement_a(),
             Instruction::ComplementCarryFlag => self.complement_carry_flag(),
             Instruction::SetCarryFlag => {
@@ -491,150 +466,6 @@ impl Cpu {
                 self.registers.set_c_flag(true);
             }
             Instruction::Nop => (),
-            Instruction::Rlc(target) => {
-                match target {
-                    IncDecTarget::A => {
-                        let value = self.rlc(self.registers.get_a());
-                        self.registers.set_a(value);
-                    }
-                    IncDecTarget::B => {
-                        let value = self.rlc(self.registers.get_b());
-                        self.registers.set_b(value);
-                    }
-                    IncDecTarget::C => {
-                        let value = self.rlc(self.registers.get_c());
-                        self.registers.set_c(value);
-                    }
-                    IncDecTarget::D => {
-                        let value = self.rlc(self.registers.get_d());
-                        self.registers.set_d(value);
-                    }
-                    IncDecTarget::E => {
-                        let value = self.rlc(self.registers.get_e());
-                        self.registers.set_e(value);
-                    }
-                    IncDecTarget::H => {
-                        let value = self.rlc(self.registers.get_h());
-                        self.registers.set_h(value);
-                    }
-                    IncDecTarget::L => {
-                        let value = self.rlc(self.registers.get_l());
-                        self.registers.set_l(value);
-                    }
-                    IncDecTarget::HL => {
-                        let value = self.rlc(self.mmu.read_byte(self.registers.get_hl()));
-                        self.mmu.write_byte(self.registers.get_hl(), value);
-                    }
-                }
-            }
-            Instruction::Rl(target) => {
-                match target {
-                    IncDecTarget::A => {
-                        let value = self.rl(self.registers.get_a());
-                        self.registers.set_a(value);
-                    }
-                    IncDecTarget::B => {
-                        let value = self.rl(self.registers.get_b());
-                        self.registers.set_b(value);
-                    }
-                    IncDecTarget::C => {
-                        let value = self.rl(self.registers.get_c());
-                        self.registers.set_c(value);
-                    }
-                    IncDecTarget::D => {
-                        let value = self.rl(self.registers.get_d());
-                        self.registers.set_d(value);
-                    }
-                    IncDecTarget::E => {
-                        let value = self.rl(self.registers.get_e());
-                        self.registers.set_e(value);
-                    }
-                    IncDecTarget::H => {
-                        let value = self.rl(self.registers.get_h());
-                        self.registers.set_h(value);
-                    }
-                    IncDecTarget::L => {
-                        let value = self.rl(self.registers.get_l());
-                        self.registers.set_l(value);
-                    }
-                    IncDecTarget::HL => {
-                        let value = self.rl(self.mmu.read_byte(self.registers.get_hl()));
-                        self.mmu.write_byte(self.registers.get_hl(), value);
-                    }
-                }
-            }
-            Instruction::Rrc(target) => {
-                match target {
-                    IncDecTarget::A => {
-                        let value = self.rrc(self.registers.get_a());
-                        self.registers.set_a(value);
-                    }
-                    IncDecTarget::B => {
-                        let value = self.rrc(self.registers.get_b());
-                        self.registers.set_b(value);
-                    }
-                    IncDecTarget::C => {
-                        let value = self.rrc(self.registers.get_c());
-                        self.registers.set_c(value);
-                    }
-                    IncDecTarget::D => {
-                        let value = self.rrc(self.registers.get_d());
-                        self.registers.set_d(value);
-                    }
-                    IncDecTarget::E => {
-                        let value = self.rrc(self.registers.get_e());
-                        self.registers.set_e(value);
-                    }
-                    IncDecTarget::H => {
-                        let value = self.rrc(self.registers.get_h());
-                        self.registers.set_h(value);
-                    }
-                    IncDecTarget::L => {
-                        let value = self.rrc(self.registers.get_l());
-                        self.registers.set_l(value);
-                    }
-                    IncDecTarget::HL => {
-                        let value = self.rrc(self.mmu.read_byte(self.registers.get_hl()));
-                        self.mmu.write_byte(self.registers.get_hl(), value);
-                    }
-                }
-            }
-            Instruction::Rr(target) => {
-                match target {
-                    IncDecTarget::A => {
-                        let value = self.rr(self.registers.get_a());
-                        self.registers.set_a(value);
-                    }
-                    IncDecTarget::B => {
-                        let value = self.rr(self.registers.get_b());
-                        self.registers.set_b(value);
-                    }
-                    IncDecTarget::C => {
-                        let value = self.rr(self.registers.get_c());
-                        self.registers.set_c(value);
-                    }
-                    IncDecTarget::D => {
-                        let value = self.rr(self.registers.get_d());
-                        self.registers.set_d(value);
-                    }
-                    IncDecTarget::E => {
-                        let value = self.rr(self.registers.get_e());
-                        self.registers.set_e(value);
-                    }
-                    IncDecTarget::H => {
-                        let value = self.rr(self.registers.get_h());
-                        self.registers.set_h(value);
-                    }
-                    IncDecTarget::L => {
-                        let value = self.rr(self.registers.get_l());
-                        self.registers.set_l(value);
-                    }
-                    IncDecTarget::HL => {
-                        let value = self.rr(self.mmu.read_byte(self.registers.get_hl()));
-                        self.mmu.write_byte(self.registers.get_hl(), value);
-                    }
-                }
-            }
         }
     }
 
