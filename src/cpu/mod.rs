@@ -312,6 +312,22 @@ impl Cpu {
             0x24 => Instruction::Sla(IncDecTarget::H),
             0x25 => Instruction::Sla(IncDecTarget::L),
             0x26 => Instruction::Sla(IncDecTarget::HL),
+            0x2F => Instruction::Sra(IncDecTarget::A),
+            0x28 => Instruction::Sra(IncDecTarget::B),
+            0x29 => Instruction::Sra(IncDecTarget::C),
+            0x2A => Instruction::Sra(IncDecTarget::D),
+            0x2B => Instruction::Sra(IncDecTarget::E),
+            0x2C => Instruction::Sra(IncDecTarget::H),
+            0x2D => Instruction::Sra(IncDecTarget::L),
+            0x2E => Instruction::Sra(IncDecTarget::HL),
+            0x3F => Instruction::Srl(IncDecTarget::A),
+            0x38 => Instruction::Srl(IncDecTarget::B),
+            0x39 => Instruction::Srl(IncDecTarget::C),
+            0x3A => Instruction::Srl(IncDecTarget::D),
+            0x3B => Instruction::Srl(IncDecTarget::E),
+            0x3C => Instruction::Srl(IncDecTarget::H),
+            0x3D => Instruction::Srl(IncDecTarget::L),
+            0x3E => Instruction::Srl(IncDecTarget::HL),
             _ => panic!("unknown opcode {}", opcode)
         }
     }
@@ -387,7 +403,9 @@ impl Cpu {
                 | Instruction::Rl(target)
                 | Instruction::Rrc(target)
                 | Instruction::Rr(target)
-                | Instruction::Sla(target) => {
+                | Instruction::Sla(target)
+                | Instruction::Sra(target)
+                | Instruction::Srl(target) => {
                 let perform_operation = |cpu: &mut Cpu, instruction: &Instruction, value| -> u8 {
                     match instruction {
                         Instruction::Inc8(_) => cpu.increment(value),
@@ -398,6 +416,8 @@ impl Cpu {
                         Instruction::Rrc(_) => cpu.rrc(value),
                         Instruction::Rr(_) => cpu.rr(value),
                         Instruction::Sla(_) => cpu.sla(value),
+                        Instruction::Sra(_) => cpu.sra(value),
+                        Instruction::Srl(_) => cpu.srl(value),
                         _ => 0,
                     }
                 };
@@ -671,6 +691,26 @@ impl Cpu {
     fn sla(&mut self, value: u8) -> u8 {
         let c = value >> 7;
         let result = value << 1;
+        self.registers.set_z_flag(result == 0);
+        self.registers.set_n_flag(false);
+        self.registers.set_h_flag(false);
+        self.registers.set_c_flag(c != 0);
+        result
+    }
+
+    fn sra(&mut self, value: u8) -> u8 {
+        let c = value & 1;
+        let result = (value >> 1) | (value & 0b1000_0000);
+        self.registers.set_z_flag(result == 0);
+        self.registers.set_n_flag(false);
+        self.registers.set_h_flag(false);
+        self.registers.set_c_flag(c != 0);
+        result
+    }
+
+    fn srl(&mut self, value: u8) -> u8 {
+        let c = value & 1;
+        let result = value >> 1;
         self.registers.set_z_flag(result == 0);
         self.registers.set_n_flag(false);
         self.registers.set_h_flag(false);
@@ -1598,6 +1638,56 @@ mod tests {
         cpu.registers.set_hl(ADDRESS);
         let sla_hl = cpu.decode_prefixed_opcode(0x26);
         cpu.execute_instruction(sla_hl);
+        assert_eq!(cpu.mmu.read_byte(cpu.registers.get_hl()), 0b0000_0000);
+        assert_eq!(cpu.registers.get_f(), 0b1001_0000);
+    }
+
+    #[test]
+    fn cpu_sra_test() {
+        let mut cpu = Cpu::new();
+
+        cpu.registers.set_a(0b1001_1001);
+        cpu.registers.set_f(0b1110_0000);
+        let sra_a = cpu.decode_prefixed_opcode(0x2F);
+        cpu.execute_instruction(sra_a);
+        assert_eq!(cpu.registers.get_a(), 0b1100_1100);
+        assert_eq!(cpu.registers.get_f(), 0b0001_0000);
+
+        let sra_a = cpu.decode_prefixed_opcode(0x2F);
+        cpu.execute_instruction(sra_a);
+        assert_eq!(cpu.registers.get_a(), 0b1110_0110);
+        assert_eq!(cpu.registers.get_f(), 0b0000_0000);
+
+        const ADDRESS: u16 = 0xABCD;
+        cpu.mmu.write_byte(ADDRESS, 0b0000_0001);
+        cpu.registers.set_hl(ADDRESS);
+        let sra_hl = cpu.decode_prefixed_opcode(0x2E);
+        cpu.execute_instruction(sra_hl);
+        assert_eq!(cpu.mmu.read_byte(cpu.registers.get_hl()), 0b0000_0000);
+        assert_eq!(cpu.registers.get_f(), 0b1001_0000);
+    }
+
+    #[test]
+    fn cpu_srl_test() {
+        let mut cpu = Cpu::new();
+
+        cpu.registers.set_a(0b1001_1001);
+        cpu.registers.set_f(0b1110_0000);
+        let srl_a = cpu.decode_prefixed_opcode(0x3F);
+        cpu.execute_instruction(srl_a);
+        assert_eq!(cpu.registers.get_a(), 0b0100_1100);
+        assert_eq!(cpu.registers.get_f(), 0b0001_0000);
+
+        let srl_a = cpu.decode_prefixed_opcode(0x3F);
+        cpu.execute_instruction(srl_a);
+        assert_eq!(cpu.registers.get_a(), 0b0010_0110);
+        assert_eq!(cpu.registers.get_f(), 0b0000_0000);
+
+        const ADDRESS: u16 = 0xABCD;
+        cpu.mmu.write_byte(ADDRESS, 0b0000_0001);
+        cpu.registers.set_hl(ADDRESS);
+        let srl_hl = cpu.decode_prefixed_opcode(0x3E);
+        cpu.execute_instruction(srl_hl);
         assert_eq!(cpu.mmu.read_byte(cpu.registers.get_hl()), 0b0000_0000);
         assert_eq!(cpu.registers.get_f(), 0b1001_0000);
     }
