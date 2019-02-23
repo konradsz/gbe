@@ -28,6 +28,7 @@ pub enum Instruction {
     Rl(IncDecTarget),
     Rrc(IncDecTarget),
     Rr(IncDecTarget),
+    Sla(IncDecTarget),
 }
 
 #[rustfmt::skip]

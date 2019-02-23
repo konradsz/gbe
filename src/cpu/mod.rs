@@ -304,6 +304,14 @@ impl Cpu {
             0x1C => Instruction::Rr(IncDecTarget::H),
             0x1D => Instruction::Rr(IncDecTarget::L),
             0x1E => Instruction::Rr(IncDecTarget::HL),
+            0x27 => Instruction::Sla(IncDecTarget::A),
+            0x20 => Instruction::Sla(IncDecTarget::B),
+            0x21 => Instruction::Sla(IncDecTarget::C),
+            0x22 => Instruction::Sla(IncDecTarget::D),
+            0x23 => Instruction::Sla(IncDecTarget::E),
+            0x24 => Instruction::Sla(IncDecTarget::H),
+            0x25 => Instruction::Sla(IncDecTarget::L),
+            0x26 => Instruction::Sla(IncDecTarget::HL),
             _ => panic!("unknown opcode {}", opcode)
         }
     }
@@ -378,7 +386,8 @@ impl Cpu {
                 | Instruction::Rlc(target)
                 | Instruction::Rl(target)
                 | Instruction::Rrc(target)
-                | Instruction::Rr(target) => {
+                | Instruction::Rr(target)
+                | Instruction::Sla(target) => {
                 let perform_operation = |cpu: &mut Cpu, instruction: &Instruction, value| -> u8 {
                     match instruction {
                         Instruction::Inc8(_) => cpu.increment(value),
@@ -388,6 +397,7 @@ impl Cpu {
                         Instruction::Rl(_) => cpu.rl(value),
                         Instruction::Rrc(_) => cpu.rrc(value),
                         Instruction::Rr(_) => cpu.rr(value),
+                        Instruction::Sla(_) => cpu.sla(value),
                         _ => 0,
                     }
                 };
@@ -631,7 +641,6 @@ impl Cpu {
     fn rl(&mut self, value: u8) -> u8 {
         let c = u8::from(self.registers.get_c_flag());
         let result = value << 1 | c;
-        self.registers.set_a(result);
         self.registers.set_z_flag(result == 0); // some says it should be false always (for A ?)
         self.registers.set_n_flag(false);
         self.registers.set_h_flag(false);
@@ -642,8 +651,6 @@ impl Cpu {
     fn rrc(&mut self, value: u8) -> u8 {
         let c: u8 = value & 1;
         let result = c << 7 | value >> 1;
-
-        self.registers.set_a(result);
         self.registers.set_z_flag(result == 0); // some says it should be false always (for A ?)
         self.registers.set_n_flag(false);
         self.registers.set_h_flag(false);
@@ -654,11 +661,20 @@ impl Cpu {
     fn rr(&mut self, value: u8) -> u8 {
         let c = u8::from(self.registers.get_c_flag());
         let result = c << 7 | value >> 1;
-        self.registers.set_a(result);
         self.registers.set_z_flag(result == 0); // some says it should be false always (for A ?)
         self.registers.set_n_flag(false);
         self.registers.set_h_flag(false);
         self.registers.set_c_flag((value & 1) != 0);
+        result
+    }
+
+    fn sla(&mut self, value: u8) -> u8 {
+        let c = value >> 7;
+        let result = value << 1;
+        self.registers.set_z_flag(result == 0);
+        self.registers.set_n_flag(false);
+        self.registers.set_h_flag(false);
+        self.registers.set_c_flag(c != 0);
         result
     }
 }
@@ -1555,9 +1571,34 @@ mod tests {
         cpu.mmu.write_byte(ADDRESS, 0b0011_1100);
         cpu.registers.set_hl(ADDRESS);
         cpu.registers.set_f(0b0001_0000);
-        let rrchl = cpu.decode_prefixed_opcode(0x0E);
-        cpu.execute_instruction(rrchl);
-        assert_eq!(cpu.mmu.read_byte(cpu.registers.get_hl()), 0b0001_1110);
+        let rrhl = cpu.decode_prefixed_opcode(0x1E);
+        cpu.execute_instruction(rrhl);
+        assert_eq!(cpu.mmu.read_byte(cpu.registers.get_hl()), 0b1001_1110);
         assert_eq!(cpu.registers.get_f(), 0b0000_0000);
+    }
+
+    #[test]
+    fn cpu_sla_test() {
+        let mut cpu = Cpu::new();
+
+        cpu.registers.set_a(0b1000_0011);
+        cpu.registers.set_f(0b1110_0000);
+        let sla_a = cpu.decode_prefixed_opcode(0x27);
+        cpu.execute_instruction(sla_a);
+        assert_eq!(cpu.registers.get_a(), 0b0000_0110);
+        assert_eq!(cpu.registers.get_f(), 0b0001_0000);
+
+        let sla_a = cpu.decode_prefixed_opcode(0x27);
+        cpu.execute_instruction(sla_a);
+        assert_eq!(cpu.registers.get_a(), 0b0000_1100);
+        assert_eq!(cpu.registers.get_f(), 0b0000_0000);
+
+        const ADDRESS: u16 = 0xABCD;
+        cpu.mmu.write_byte(ADDRESS, 0b1000_0000);
+        cpu.registers.set_hl(ADDRESS);
+        let sla_hl = cpu.decode_prefixed_opcode(0x26);
+        cpu.execute_instruction(sla_hl);
+        assert_eq!(cpu.mmu.read_byte(cpu.registers.get_hl()), 0b0000_0000);
+        assert_eq!(cpu.registers.get_f(), 0b1001_0000);
     }
 }
