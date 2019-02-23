@@ -31,6 +31,7 @@ pub enum Instruction {
     Sla(IncDecTarget),
     Sra(IncDecTarget),
     Srl(IncDecTarget),
+    Bit(IncDecTarget, u8),
 }
 
 #[rustfmt::skip]

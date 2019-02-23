@@ -328,6 +328,39 @@ impl Cpu {
             0x3C => Instruction::Srl(IncDecTarget::H),
             0x3D => Instruction::Srl(IncDecTarget::L),
             0x3E => Instruction::Srl(IncDecTarget::HL),
+
+            0x47 | 0x4F | 0x57 | 0x5F | 0x67 | 0x6F | 0x77 | 0x7F => {
+                let bit = (opcode - 0x47) / 0x8;
+                Instruction::Bit(IncDecTarget::A, bit)
+            }
+            0x40 | 0x48 | 0x50 | 0x58 | 0x60 | 0x68 | 0x70 | 0x78 => {
+                let bit = (opcode - 0x40) / 0x8;
+                Instruction::Bit(IncDecTarget::B, bit)
+            }
+            0x41 | 0x49 | 0x51 | 0x59 | 0x61 | 0x69 | 0x71 | 0x79 => {
+                let bit = (opcode - 0x41) / 0x8;
+                Instruction::Bit(IncDecTarget::C, bit)
+            }
+            0x42 | 0x4A | 0x52 | 0x5A | 0x62 | 0x6A | 0x72 | 0x7A => {
+                let bit = (opcode - 0x42) / 0x8;
+                Instruction::Bit(IncDecTarget::D, bit)
+            }
+            0x43 | 0x4B | 0x53 | 0x5B | 0x63 | 0x6B | 0x73 | 0x7B => {
+                let bit = (opcode - 0x43) / 0x8;
+                Instruction::Bit(IncDecTarget::E, bit)
+            }
+            0x44 | 0x4C | 0x54 | 0x5C | 0x64 | 0x6C | 0x74 | 0x7C => {
+                let bit = (opcode - 0x44) / 0x8;
+                Instruction::Bit(IncDecTarget::H, bit)
+            }
+            0x45 | 0x4D | 0x55 | 0x5D | 0x65 | 0x6D | 0x75 | 0x7D => {
+                let bit = (opcode - 0x45) / 0x8;
+                Instruction::Bit(IncDecTarget::L, bit)
+            }
+            0x46 | 0x4E | 0x56 | 0x5E | 0x66 | 0x6E | 0x76 | 0x7E => {
+                let bit = (opcode - 0x46) / 0x8;
+                Instruction::Bit(IncDecTarget::HL, bit)
+            }
             _ => panic!("unknown opcode {}", opcode)
         }
     }
@@ -496,6 +529,18 @@ impl Cpu {
                 self.registers.set_c_flag(true);
             }
             Instruction::Nop => (),
+            Instruction::Bit(target, bit) => {
+                match target {
+                    IncDecTarget::A => self.bit(self.registers.get_a(), *bit),
+                    IncDecTarget::B => self.bit(self.registers.get_b(), *bit),
+                    IncDecTarget::C => self.bit(self.registers.get_c(), *bit),
+                    IncDecTarget::D => self.bit(self.registers.get_d(), *bit),
+                    IncDecTarget::E => self.bit(self.registers.get_e(), *bit),
+                    IncDecTarget::H => self.bit(self.registers.get_h(), *bit),
+                    IncDecTarget::L => self.bit(self.registers.get_l(), *bit),
+                    IncDecTarget::HL => self.bit(self.mmu.read_byte(self.registers.get_hl()), *bit),
+                }
+            }
         }
     }
 
@@ -716,6 +761,12 @@ impl Cpu {
         self.registers.set_h_flag(false);
         self.registers.set_c_flag(c != 0);
         result
+    }
+
+    fn bit(&mut self, value: u8, bit: u8) {
+        self.registers.set_z_flag((value & (1 << bit)) == 0);
+        self.registers.set_n_flag(false);
+        self.registers.set_h_flag(true);
     }
 }
 
@@ -1690,5 +1741,84 @@ mod tests {
         cpu.execute_instruction(srl_hl);
         assert_eq!(cpu.mmu.read_byte(cpu.registers.get_hl()), 0b0000_0000);
         assert_eq!(cpu.registers.get_f(), 0b1001_0000);
+    }
+
+    #[test]
+    fn cpu_bit_test() {
+        let mut cpu = Cpu::new();
+
+        cpu.registers.set_a(0b0000_0000);
+        cpu.registers.set_f(0b1111_0000);
+        let bit = cpu.decode_prefixed_opcode(0x47);
+        cpu.execute_instruction(bit);
+        assert_eq!(cpu.registers.get_f(), 0b1011_0000);
+        assert_eq!(cpu.registers.get_z_flag(), true);
+
+        const ADDRESS: u16 = 0xABCD;
+        cpu.registers.set_hl(ADDRESS);
+
+        let mut test_register = |register, opcodes: Vec<u8>| {
+            for (i, current_opcode) in opcodes.iter().enumerate() {
+                match register {
+                    IncDecTarget::A => {
+                        cpu.registers.set_a(1 << i);
+                    }
+                    IncDecTarget::B => {
+                        cpu.registers.set_b(1 << i);
+                    }
+                    IncDecTarget::C => {
+                        cpu.registers.set_c(1 << i);
+                    }
+                    IncDecTarget::D => {
+                        cpu.registers.set_d(1 << i);
+                    }
+                    IncDecTarget::E => {
+                        cpu.registers.set_e(1 << i);
+                    }
+                    IncDecTarget::H => {
+                        cpu.registers.set_h(1 << i);
+                    }
+                    IncDecTarget::L => {
+                        cpu.registers.set_l(1 << i);
+                    }
+                    IncDecTarget::HL => {
+                        cpu.mmu.write_byte(cpu.registers.get_hl(), 1 << i);
+                    }
+                }
+                let bit = cpu.decode_prefixed_opcode(*current_opcode);
+                cpu.execute_instruction(bit);
+                assert_eq!(cpu.registers.get_z_flag(), false);
+
+                for not_current_opcode in opcodes.iter().filter(|&o| o != current_opcode) {
+                    let bit = cpu.decode_prefixed_opcode(*not_current_opcode);
+                    cpu.execute_instruction(bit);
+                    assert_eq!(cpu.registers.get_z_flag(), true);
+                }
+            }
+        };
+
+        let register_a_opcodes = vec![0x47, 0x4F, 0x57, 0x5F, 0x67, 0x6F, 0x77, 0x7F];
+        test_register(IncDecTarget::A, register_a_opcodes);
+
+        let register_b_opcodes = vec![0x40, 0x48, 0x50, 0x58, 0x60, 0x68, 0x70, 0x78];
+        test_register(IncDecTarget::B, register_b_opcodes);
+
+        let register_c_opcodes = vec![0x41, 0x49, 0x51, 0x59, 0x61, 0x69, 0x71, 0x79];
+        test_register(IncDecTarget::C, register_c_opcodes);
+
+        let register_d_opcodes = vec![0x42, 0x4A, 0x52, 0x5A, 0x62, 0x6A, 0x72, 0x7A];
+        test_register(IncDecTarget::D, register_d_opcodes);
+
+        let register_e_opcodes = vec![0x43, 0x4B, 0x53, 0x5B, 0x63, 0x6B, 0x73, 0x7B];
+        test_register(IncDecTarget::E, register_e_opcodes);
+
+        let register_h_opcodes = vec![0x44, 0x4C, 0x54, 0x5C, 0x64, 0x6C, 0x74, 0x7C];
+        test_register(IncDecTarget::H, register_h_opcodes);
+
+        let register_l_opcodes = vec![0x45, 0x4D, 0x55, 0x5D, 0x65, 0x6D, 0x75, 0x7D];
+        test_register(IncDecTarget::L, register_l_opcodes);
+
+        let register_hl_opcodes = vec![0x46, 0x4E, 0x56, 0x5E, 0x66, 0x6E, 0x76, 0x7E];
+        test_register(IncDecTarget::HL, register_hl_opcodes);
     }
 }

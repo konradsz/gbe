@@ -151,6 +151,10 @@ impl Registers {
         self.f.z = state;
     }
 
+    pub fn get_z_flag(&self) -> bool {
+        self.f.z
+    }
+
     pub fn set_n_flag(&mut self, state: bool) {
         self.f.n = state;
     }
