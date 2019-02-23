@@ -394,6 +394,39 @@ impl Cpu {
                 Instruction::Set(IncDecTarget::HL, bit)
             }
 
+            0x87 | 0x8F | 0x97 | 0x9F | 0xA7 | 0xAF | 0xB7 | 0xBF => {
+                let bit = (opcode - 0x87) / 0x8;
+                Instruction::Res(IncDecTarget::A, bit)
+            }
+            0x80 | 0x88 | 0x90 | 0x98 | 0xA0 | 0xA8 | 0xB0 | 0xB8 => {
+                let bit = (opcode - 0x80) / 0x8;
+                Instruction::Res(IncDecTarget::B, bit)
+            }
+            0x81 | 0x89 | 0x91 | 0x99 | 0xA1 | 0xA9 | 0xB1 | 0xB9 => {
+                let bit = (opcode - 0x81) / 0x8;
+                Instruction::Res(IncDecTarget::C, bit)
+            }
+            0x82 | 0x8A | 0x92 | 0x9A | 0xA2 | 0xAA | 0xB2 | 0xBA => {
+                let bit = (opcode - 0x82) / 0x8;
+                Instruction::Res(IncDecTarget::D, bit)
+            }
+            0x83 | 0x8B | 0x93 | 0x9B | 0xA3 | 0xAB | 0xB3 | 0xBB => {
+                let bit = (opcode - 0x83) / 0x8;
+                Instruction::Res(IncDecTarget::E, bit)
+            }
+            0x84 | 0x8C | 0x94 | 0x9C | 0xA4 | 0xAC | 0xB4 | 0xBC => {
+                let bit = (opcode - 0x84) / 0x8;
+                Instruction::Res(IncDecTarget::H, bit)
+            }
+            0x85 | 0x8D | 0x95 | 0x9D | 0xA5 | 0xAD | 0xB5 | 0xBD => {
+                let bit = (opcode - 0x85) / 0x8;
+                Instruction::Res(IncDecTarget::L, bit)
+            }
+            0x86 | 0x8E | 0x96 | 0x9E | 0xA6 | 0xAE | 0xB6 | 0xBE => {
+                let bit = (opcode - 0x86) / 0x8;
+                Instruction::Res(IncDecTarget::HL, bit)
+            }
+
             _ => panic!("unknown opcode {}", opcode)
         }
     }
@@ -584,6 +617,18 @@ impl Cpu {
                     IncDecTarget::H => self.registers.set_h(self.set(self.registers.get_h(), *bit)),
                     IncDecTarget::L => self.registers.set_l(self.set(self.registers.get_l(), *bit)),
                     IncDecTarget::HL => self.mmu.write_byte(self.registers.get_hl(), self.set(self.mmu.read_byte(self.registers.get_hl()), *bit)),
+                }
+            }
+            Instruction::Res(target, bit) => {
+                match target {
+                    IncDecTarget::A => self.registers.set_a(self.reset(self.registers.get_a(), *bit)),
+                    IncDecTarget::B => self.registers.set_b(self.reset(self.registers.get_b(), *bit)),
+                    IncDecTarget::C => self.registers.set_c(self.reset(self.registers.get_c(), *bit)),
+                    IncDecTarget::D => self.registers.set_d(self.reset(self.registers.get_d(), *bit)),
+                    IncDecTarget::E => self.registers.set_e(self.reset(self.registers.get_e(), *bit)),
+                    IncDecTarget::H => self.registers.set_h(self.reset(self.registers.get_h(), *bit)),
+                    IncDecTarget::L => self.registers.set_l(self.reset(self.registers.get_l(), *bit)),
+                    IncDecTarget::HL => self.mmu.write_byte(self.registers.get_hl(), self.reset(self.mmu.read_byte(self.registers.get_hl()), *bit)),
                 }
             }
         }
@@ -816,6 +861,10 @@ impl Cpu {
 
     fn set(&self, value: u8, bit: u8) -> u8 {
         value | (1 << bit)
+    }
+
+    fn reset(&self, value: u8, bit: u8) -> u8 {
+        value ^ (1 << bit)
     }
 }
 
@@ -1803,9 +1852,6 @@ mod tests {
         assert_eq!(cpu.registers.get_f(), 0b1011_0000);
         assert_eq!(cpu.registers.get_z_flag(), true);
 
-        const ADDRESS: u16 = 0xABCD;
-        cpu.registers.set_hl(ADDRESS);
-
         let mut test_register = |register, opcodes: Vec<u8>| {
             for (i, current_opcode) in opcodes.iter().enumerate() {
                 match register {
@@ -1875,62 +1921,107 @@ mod tests {
     fn cpu_set_test() {
         let mut cpu = Cpu::new();
 
+        let mut test_register = |cpu: &mut Cpu, register, opcodes: Vec<u8>| {
+            let mut previous_value = 0;
+            for (i, opcode) in opcodes.iter().enumerate() {
+                let set = cpu.decode_prefixed_opcode(*opcode);
+                cpu.execute_instruction(set);
+                let value = match register {
+                    IncDecTarget::A => cpu.registers.get_a(),
+                    IncDecTarget::B => cpu.registers.get_b(),
+                    IncDecTarget::C => cpu.registers.get_c(),
+                    IncDecTarget::D => cpu.registers.get_d(),
+                    IncDecTarget::E => cpu.registers.get_e(),
+                    IncDecTarget::H => cpu.registers.get_h(),
+                    IncDecTarget::L => cpu.registers.get_l(),
+                    IncDecTarget::HL => cpu.mmu.read_byte(cpu.registers.get_hl())
+                };
+                assert_eq!(value, previous_value + 2u8.pow(i as u32));
+                previous_value = value;
+            }
+        };
+
         let register_a_opcodes = vec![0xC7, 0xCF, 0xD7, 0xDF, 0xE7, 0xEF, 0xF7, 0xFF];
-        for (i, opcode) in register_a_opcodes.iter().enumerate() {
-            let set = cpu.decode_prefixed_opcode(*opcode);
-            cpu.execute_instruction(set);
-            assert_eq!(cpu.registers.get_a(), cpu.registers.get_a() | (1 << i));
-        }
+        test_register(&mut cpu, IncDecTarget::A, register_a_opcodes);
 
         let register_b_opcodes = vec![0xC0, 0xC8, 0xD0, 0xD8, 0xE0, 0xE8, 0xF0, 0xF8];
-        for (i, opcode) in register_b_opcodes.iter().enumerate() {
-            let set = cpu.decode_prefixed_opcode(*opcode);
-            cpu.execute_instruction(set);
-            assert_eq!(cpu.registers.get_b(), cpu.registers.get_b() | (1 << i));
-        }
+        test_register(&mut cpu, IncDecTarget::B, register_b_opcodes);
 
         let register_c_opcodes = vec![0xC1, 0xC9, 0xD1, 0xD9, 0xE1, 0xE9, 0xF1, 0xF9];
-        for (i, opcode) in register_c_opcodes.iter().enumerate() {
-            let set = cpu.decode_prefixed_opcode(*opcode);
-            cpu.execute_instruction(set);
-            assert_eq!(cpu.registers.get_c(), cpu.registers.get_c() | (1 << i));
-        }
+        test_register(&mut cpu, IncDecTarget::C, register_c_opcodes);
 
         let register_d_opcodes = vec![0xC2, 0xCA, 0xD2, 0xDA, 0xE2, 0xEA, 0xF2, 0xFA];
-        for (i, opcode) in register_d_opcodes.iter().enumerate() {
-            let set = cpu.decode_prefixed_opcode(*opcode);
-            cpu.execute_instruction(set);
-            assert_eq!(cpu.registers.get_d(), cpu.registers.get_d() | (1 << i));
-        }
+        test_register(&mut cpu, IncDecTarget::D, register_d_opcodes);
 
         let register_e_opcodes = vec![0xC3, 0xCB, 0xD3, 0xDB, 0xE3, 0xEB, 0xF3, 0xFB];
-        for (i, opcode) in register_e_opcodes.iter().enumerate() {
-            let set = cpu.decode_prefixed_opcode(*opcode);
-            cpu.execute_instruction(set);
-            assert_eq!(cpu.registers.get_e(), cpu.registers.get_e() | (1 << i));
-        }
+        test_register(&mut cpu, IncDecTarget::E, register_e_opcodes);
 
         let register_h_opcodes = vec![0xC4, 0xCC, 0xD4, 0xDC, 0xE4, 0xEC, 0xF4, 0xFC];
-        for (i, opcode) in register_h_opcodes.iter().enumerate() {
-            let set = cpu.decode_prefixed_opcode(*opcode);
-            cpu.execute_instruction(set);
-            assert_eq!(cpu.registers.get_h(), cpu.registers.get_h() | (1 << i));
-        }
+        test_register(&mut cpu, IncDecTarget::H, register_h_opcodes);
 
         let register_l_opcodes = vec![0xC5, 0xCD, 0xD5, 0xDD, 0xE5, 0xED, 0xF5, 0xFD];
-        for (i, opcode) in register_l_opcodes.iter().enumerate() {
-            let set = cpu.decode_prefixed_opcode(*opcode);
-            cpu.execute_instruction(set);
-            assert_eq!(cpu.registers.get_l(), cpu.registers.get_l() | (1 << i));
-        }
+        test_register(&mut cpu, IncDecTarget::L, register_l_opcodes);
 
-        const ADDRESS: u16 = 0xABCD;
-        cpu.registers.set_hl(ADDRESS);
+        cpu.registers.set_hl(0xABCD);
         let register_hl_opcodes = vec![0xC6, 0xCE, 0xD6, 0xDE, 0xE6, 0xEE, 0xF6, 0xFE];
-        for (i, opcode) in register_hl_opcodes.iter().enumerate() {
-            let set = cpu.decode_prefixed_opcode(*opcode);
-            cpu.execute_instruction(set);
-            assert_eq!(cpu.mmu.read_byte(cpu.registers.get_hl()), cpu.mmu.read_byte(cpu.registers.get_hl()) | (1 << i));
-        }
+        test_register(&mut cpu, IncDecTarget::HL, register_hl_opcodes);
+    }
+
+    #[test]
+    fn cpu_reset_test() {
+        let mut cpu = Cpu::new();
+
+        let mut test_register = |cpu: &mut Cpu, register, opcodes: Vec<u8>| {
+            let mut previous_value = 0b1111_1111;
+            for (i, opcode) in opcodes.iter().enumerate() {
+                let set = cpu.decode_prefixed_opcode(*opcode);
+                cpu.execute_instruction(set);
+                let value = match register {
+                    IncDecTarget::A => cpu.registers.get_a(),
+                    IncDecTarget::B => cpu.registers.get_b(),
+                    IncDecTarget::C => cpu.registers.get_c(),
+                    IncDecTarget::D => cpu.registers.get_d(),
+                    IncDecTarget::E => cpu.registers.get_e(),
+                    IncDecTarget::H => cpu.registers.get_h(),
+                    IncDecTarget::L => cpu.registers.get_l(),
+                    IncDecTarget::HL => cpu.mmu.read_byte(cpu.registers.get_hl())
+                };
+                assert_eq!(value, previous_value - 2u8.pow(i as u32));
+                previous_value = value;
+            }
+        };
+
+        let register_a_opcodes = vec![0x87, 0x8F, 0x97, 0x9F, 0xA7, 0xAF, 0xB7, 0xBF];
+        cpu.registers.set_a(0b1111_1111);
+        test_register(&mut cpu, IncDecTarget::A, register_a_opcodes);
+
+        let register_b_opcodes = vec![0x80, 0x88, 0x90, 0x98, 0xA0, 0xA8, 0xB0, 0xB8];
+        cpu.registers.set_b(0b1111_1111);
+        test_register(&mut cpu, IncDecTarget::B, register_b_opcodes);
+
+        let register_c_opcodes = vec![0x81, 0x89, 0x91, 0x99, 0xA1, 0xA9, 0xB1, 0xB9];
+        cpu.registers.set_c(0b1111_1111);
+        test_register(&mut cpu, IncDecTarget::C, register_c_opcodes);
+
+        let register_d_opcodes = vec![0x82, 0x8A, 0x92, 0x9A, 0xA2, 0xAA, 0xB2, 0xBA];
+        cpu.registers.set_d(0b1111_1111);
+        test_register(&mut cpu, IncDecTarget::D, register_d_opcodes);
+
+        let register_e_opcodes = vec![0x83, 0x8B, 0x93, 0x9B, 0xA3, 0xAB, 0xB3, 0xBB];
+        cpu.registers.set_e(0b1111_1111);
+        test_register(&mut cpu, IncDecTarget::E, register_e_opcodes);
+
+        let register_h_opcodes = vec![0x84, 0x8C, 0x94, 0x9C, 0xA4, 0xAC, 0xB4, 0xBC];
+        cpu.registers.set_h(0b1111_1111);
+        test_register(&mut cpu, IncDecTarget::H, register_h_opcodes);
+
+        let register_l_opcodes = vec![0x85, 0x8D, 0x95, 0x9D, 0xA5, 0xAD, 0xB5, 0xBD];
+        cpu.registers.set_l(0b1111_1111);
+        test_register(&mut cpu, IncDecTarget::L, register_l_opcodes);
+
+        let register_hl_opcodes = vec![0x86, 0x8E, 0x96, 0x9E, 0xA6, 0xAE, 0xB6, 0xBE];
+        cpu.registers.set_hl(0xABCD);
+        cpu.mmu.write_byte(cpu.registers.get_hl(), 0b1111_1111);
+        test_register(&mut cpu, IncDecTarget::HL, register_hl_opcodes);
     }
 }

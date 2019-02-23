@@ -33,6 +33,7 @@ pub enum Instruction {
     Srl(IncDecTarget),
     Bit(IncDecTarget, u8),
     Set(IncDecTarget, u8),
+    Res(IncDecTarget, u8),
 }
 
 #[rustfmt::skip]
