@@ -41,6 +41,7 @@ pub enum Instruction {
     Jrcc(bool),
     Call,
     Callcc(bool),
+    Rst(u8),
 }
 
 #[rustfmt::skip]

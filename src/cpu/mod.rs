@@ -285,6 +285,14 @@ impl Cpu {
             0xCC => Instruction::Callcc(self.registers.get_z_flag()),
             0xD4 => Instruction::Callcc(!self.registers.get_c_flag()),
             0xDC => Instruction::Callcc(self.registers.get_c_flag()),
+            0xC7 => Instruction::Rst(0x00),
+            0xCF => Instruction::Rst(0x08),
+            0xD7 => Instruction::Rst(0x10),
+            0xDF => Instruction::Rst(0x18),
+            0xE7 => Instruction::Rst(0x20),
+            0xEF => Instruction::Rst(0x28),
+            0xF7 => Instruction::Rst(0x30),
+            0xFF => Instruction::Rst(0x38),
             _ => panic!("unknown opcode {}", opcode)
         }
     }
@@ -677,6 +685,7 @@ impl Cpu {
                     self.call();
                 }
             }
+            Instruction::Rst(offset) => self.restart(*offset),
         }
     }
 
@@ -921,6 +930,11 @@ impl Cpu {
         let instruction_address = self.next_word();
         self.push(self.registers.get_pc());
         self.jump(instruction_address);
+    }
+
+    fn restart(&mut self, offset: u8) {
+        self.push(self.registers.get_pc());
+        self.jump(0x0000 + u16::from(offset));
     }
 }
 
@@ -2276,5 +2290,59 @@ mod tests {
         cpu.execute_instruction(call_c_true);
         assert_eq!(cpu.registers.get_pc(), 0x3456);
         assert_eq!(cpu.pop(), 0x3000 + 2);
+    }
+
+    #[test]
+    fn cpu_restart_test() {
+        let mut cpu = Cpu::new();
+        cpu.registers.set_sp(0xFEEE);
+
+        cpu.registers.set_pc(0x1000);
+        let rst_00 = cpu.decode_opcode(0xC7);
+        cpu.execute_instruction(rst_00);
+        assert_eq!(cpu.registers.get_pc(), 0x0000);
+        assert_eq!(cpu.pop(), 0x1000);
+
+        cpu.registers.set_pc(0x2000);
+        let rst_08 = cpu.decode_opcode(0xCF);
+        cpu.execute_instruction(rst_08);
+        assert_eq!(cpu.registers.get_pc(), 0x0008);
+        assert_eq!(cpu.pop(), 0x2000);
+
+        cpu.registers.set_pc(0x3000);
+        let rst_10 = cpu.decode_opcode(0xD7);
+        cpu.execute_instruction(rst_10);
+        assert_eq!(cpu.registers.get_pc(), 0x0010);
+        assert_eq!(cpu.pop(), 0x3000);
+
+        cpu.registers.set_pc(0x4000);
+        let rst_18 = cpu.decode_opcode(0xDF);
+        cpu.execute_instruction(rst_18);
+        assert_eq!(cpu.registers.get_pc(), 0x0018);
+        assert_eq!(cpu.pop(), 0x4000);
+
+        cpu.registers.set_pc(0x5000);
+        let rst_20 = cpu.decode_opcode(0xE7);
+        cpu.execute_instruction(rst_20);
+        assert_eq!(cpu.registers.get_pc(), 0x0020);
+        assert_eq!(cpu.pop(), 0x5000);
+
+        cpu.registers.set_pc(0x6000);
+        let rst_28 = cpu.decode_opcode(0xEF);
+        cpu.execute_instruction(rst_28);
+        assert_eq!(cpu.registers.get_pc(), 0x0028);
+        assert_eq!(cpu.pop(), 0x6000);
+
+        cpu.registers.set_pc(0x7000);
+        let rst_30 = cpu.decode_opcode(0xF7);
+        cpu.execute_instruction(rst_30);
+        assert_eq!(cpu.registers.get_pc(), 0x0030);
+        assert_eq!(cpu.pop(), 0x7000);
+
+        cpu.registers.set_pc(0x8000);
+        let rst_38 = cpu.decode_opcode(0xFF);
+        cpu.execute_instruction(rst_38);
+        assert_eq!(cpu.registers.get_pc(), 0x0038);
+        assert_eq!(cpu.pop(), 0x8000);
     }
 }
