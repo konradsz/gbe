@@ -293,6 +293,12 @@ impl Cpu {
             0xEF => Instruction::Rst(0x28),
             0xF7 => Instruction::Rst(0x30),
             0xFF => Instruction::Rst(0x38),
+            0xC9 => Instruction::Ret,
+            0xC0 => Instruction::Retcc(!self.registers.get_z_flag()),
+            0xC8 => Instruction::Retcc(self.registers.get_z_flag()),
+            0xD0 => Instruction::Retcc(!self.registers.get_c_flag()),
+            0xD8 => Instruction::Retcc(self.registers.get_c_flag()),
+            0xD9 => panic!("RETI instruction not implemented"),
             _ => panic!("unknown opcode {}", opcode)
         }
     }
@@ -686,6 +692,12 @@ impl Cpu {
                 }
             }
             Instruction::Rst(offset) => self.restart(*offset),
+            Instruction::Ret => self.ret(),
+            Instruction::Retcc(condition) => {
+                if *condition {
+                    self.ret();
+                }
+            }
         }
     }
 
@@ -935,6 +947,11 @@ impl Cpu {
     fn restart(&mut self, offset: u8) {
         self.push(self.registers.get_pc());
         self.jump(0x0000 + u16::from(offset));
+    }
+
+    fn ret(&mut self) {
+        let address = self.pop();
+        self.jump(address);
     }
 }
 
@@ -2344,5 +2361,63 @@ mod tests {
         cpu.execute_instruction(rst_38);
         assert_eq!(cpu.registers.get_pc(), 0x0038);
         assert_eq!(cpu.pop(), 0x8000);
+    }
+
+    #[test]
+    fn cpu_ret_test() {
+        let mut cpu = Cpu::new();
+
+        // return
+        cpu.registers.set_sp(0xFEEE);
+        cpu.push(0x1000);
+        let ret = cpu.decode_opcode(0xC9);
+        cpu.execute_instruction(ret);
+        assert_eq!(cpu.registers.get_pc(), 0x1000);
+
+        // return if not Z
+        cpu.push(0x2000);
+        cpu.registers.set_z_flag(true);
+        let ret_nz_true = cpu.decode_opcode(0xC0);
+        cpu.execute_instruction(ret_nz_true);
+        assert_eq!(cpu.registers.get_pc(), 0x1000);
+
+        cpu.registers.set_z_flag(false);
+        let ret_nz_false = cpu.decode_opcode(0xC0);
+        cpu.execute_instruction(ret_nz_false);
+        assert_eq!(cpu.registers.get_pc(), 0x2000);
+
+        // return if Z
+        cpu.push(0x3000);
+        let ret_z_false = cpu.decode_opcode(0xC8);
+        cpu.execute_instruction(ret_z_false);
+        assert_eq!(cpu.registers.get_pc(), 0x2000);
+
+        cpu.registers.set_z_flag(true);
+        let ret_z_true = cpu.decode_opcode(0xC8);
+        cpu.execute_instruction(ret_z_true);
+        assert_eq!(cpu.registers.get_pc(), 0x3000);
+
+        // return if not C
+        cpu.push(0x4000);
+        cpu.registers.set_c_flag(true);
+        let ret_nc_true = cpu.decode_opcode(0xD0);
+        cpu.execute_instruction(ret_nc_true);
+        assert_eq!(cpu.registers.get_pc(), 0x3000);
+
+        cpu.registers.set_c_flag(false);
+        let ret_nc_false = cpu.decode_opcode(0xD0);
+        cpu.execute_instruction(ret_nc_false);
+        assert_eq!(cpu.registers.get_pc(), 0x4000);
+
+        // return if C
+        cpu.push(0x5000);
+        let ret_c_false = cpu.decode_opcode(0xD8);
+        cpu.execute_instruction(ret_c_false);
+        assert_eq!(cpu.registers.get_pc(), 0x4000);
+
+        cpu.registers.set_c_flag(true);
+        let ret_c_true = cpu.decode_opcode(0xD8);
+        cpu.execute_instruction(ret_c_true);
+        assert_eq!(cpu.registers.get_pc(), 0x5000);
     }
 }
