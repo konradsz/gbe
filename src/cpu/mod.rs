@@ -18,16 +18,26 @@ impl Cpu {
     }
 
     fn step(&mut self) {
-        let opcode = self.mmu.read_byte(self.registers.get_and_increment_pc());
+        let opcode = self.next_byte();
 
         let instruction;
         if opcode == 0xCB {
-            let prefixed_opcode = self.mmu.read_byte(self.registers.get_and_increment_pc());
+            let prefixed_opcode = self.next_byte();
             instruction = self.decode_prefixed_opcode(prefixed_opcode);
         } else {
             instruction = self.decode_opcode(opcode);
         }
         self.execute_instruction(instruction);
+    }
+
+    fn next_byte(&mut self) -> u8 {
+        self.mmu.read_byte(self.registers.get_and_increment_pc())
+    }
+
+    fn next_word(&mut self) -> u16 {
+        let lsb = self.next_byte();
+        let msb = self.next_byte();
+        u16::from(msb) << 8 | u16::from(lsb)
     }
 
     // move to MMU
@@ -270,6 +280,11 @@ impl Cpu {
             0x28 => Instruction::Jrcc(self.registers.get_z_flag()),
             0x30 => Instruction::Jrcc(!self.registers.get_c_flag()),
             0x38 => Instruction::Jrcc(self.registers.get_c_flag()),
+            0xCD => Instruction::Call,
+            0xC4 => Instruction::Callcc(!self.registers.get_z_flag()),
+            0xCC => Instruction::Callcc(self.registers.get_z_flag()),
+            0xD4 => Instruction::Callcc(!self.registers.get_c_flag()),
+            0xDC => Instruction::Callcc(self.registers.get_c_flag()),
             _ => panic!("unknown opcode {}", opcode)
         }
     }
@@ -656,6 +671,12 @@ impl Cpu {
                     self.jump(self.registers.get_pc() + u16::from(self.mmu.read_byte(self.registers.get_pc())));
                 }
             }
+            Instruction::Call => self.call(),
+            Instruction::Callcc(condition) => {
+                if *condition {
+                    self.call();
+                }
+            }
         }
     }
 
@@ -894,6 +915,12 @@ impl Cpu {
 
     fn jump(&mut self, address: u16) {
         self.registers.set_pc(address);
+    }
+
+    fn call(&mut self) {
+        let instruction_address = self.next_word();
+        self.push(self.registers.get_pc());
+        self.jump(instruction_address);
     }
 }
 
@@ -2176,5 +2203,78 @@ mod tests {
         let jr_c_true = cpu.decode_opcode(0x38);
         cpu.execute_instruction(jr_c_true);
         assert_eq!(cpu.registers.get_pc(), 0x4567 + 0xFF);
+    }
+
+    #[test]
+    fn cpu_call_test() {
+        let mut cpu = Cpu::new();
+
+        // call
+        cpu.registers.set_pc(0xABCD);
+        cpu.registers.set_sp(0xFEEE);
+        cpu.mmu.write_byte(cpu.registers.get_pc(), 0xAD);
+        cpu.mmu.write_byte(cpu.registers.get_pc() + 1, 0xDE);
+        let call = cpu.decode_opcode(0xCD);
+        cpu.execute_instruction(call);
+        assert_eq!(cpu.registers.get_pc(), 0xDEAD);
+        assert_eq!(cpu.pop(), 0xABCD + 2);
+
+        // call if not Z
+        cpu.registers.set_z_flag(true);
+        cpu.registers.set_pc(0xDEDE);
+        cpu.mmu.write_byte(cpu.registers.get_pc(), 0xEF);
+        cpu.mmu.write_byte(cpu.registers.get_pc() + 1, 0xBE);
+        let call_nz_true = cpu.decode_opcode(0xC4);
+        cpu.execute_instruction(call_nz_true);
+        assert_eq!(cpu.registers.get_pc(), 0xDEDE);
+
+        cpu.registers.set_z_flag(false);
+        let call_nz_false = cpu.decode_opcode(0xC4);
+        cpu.execute_instruction(call_nz_false);
+        assert_eq!(cpu.registers.get_pc(), 0xBEEF);
+        assert_eq!(cpu.pop(), 0xDEDE + 2);
+
+        // call if Z
+        cpu.registers.set_pc(0x1000);
+        cpu.mmu.write_byte(cpu.registers.get_pc(), 0x34);
+        cpu.mmu.write_byte(cpu.registers.get_pc() + 1, 0x12);
+        let call_z_false = cpu.decode_opcode(0xCC);
+        cpu.execute_instruction(call_z_false);
+        assert_eq!(cpu.registers.get_pc(), 0x1000);
+
+        cpu.registers.set_z_flag(true);
+        let call_z_true = cpu.decode_opcode(0xCC);
+        cpu.execute_instruction(call_z_true);
+        assert_eq!(cpu.registers.get_pc(), 0x1234);
+        assert_eq!(cpu.pop(), 0x1000 + 2);
+
+        // call if not C
+        cpu.registers.set_pc(0x2000);
+        cpu.registers.set_c_flag(true);
+        cpu.mmu.write_byte(cpu.registers.get_pc(), 0x45);
+        cpu.mmu.write_byte(cpu.registers.get_pc() + 1, 0x23);
+        let call_nc_true = cpu.decode_opcode(0xD4);
+        cpu.execute_instruction(call_nc_true);
+        assert_eq!(cpu.registers.get_pc(), 0x2000);
+
+        cpu.registers.set_c_flag(false);
+        let call_nc_false = cpu.decode_opcode(0xD4);
+        cpu.execute_instruction(call_nc_false);
+        assert_eq!(cpu.registers.get_pc(), 0x2345);
+        assert_eq!(cpu.pop(), 0x2000 + 2);
+
+        // call if C
+        cpu.registers.set_pc(0x3000);
+        cpu.mmu.write_byte(cpu.registers.get_pc(), 0x56);
+        cpu.mmu.write_byte(cpu.registers.get_pc() + 1, 0x34);
+        let call_c_false = cpu.decode_opcode(0xDC);
+        cpu.execute_instruction(call_c_false);
+        assert_eq!(cpu.registers.get_pc(), 0x3000);
+
+        cpu.registers.set_c_flag(true);
+        let call_c_true = cpu.decode_opcode(0xDC);
+        cpu.execute_instruction(call_c_true);
+        assert_eq!(cpu.registers.get_pc(), 0x3456);
+        assert_eq!(cpu.pop(), 0x3000 + 2);
     }
 }

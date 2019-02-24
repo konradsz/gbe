@@ -39,6 +39,8 @@ pub enum Instruction {
     Jphl,
     Jrn,
     Jrcc(bool),
+    Call,
+    Callcc(bool),
 }
 
 #[rustfmt::skip]
