@@ -30,6 +30,7 @@ impl Cpu {
         self.execute_instruction(instruction);
     }
 
+    // move to MMU
     fn read_word(&self) -> u16 {
         let lsb = self.mmu.read_byte(self.registers.get_pc());
         let msb = self.mmu.read_byte(self.registers.get_pc() + 1);
@@ -258,6 +259,17 @@ impl Cpu {
             0x17 => Instruction::Rl(IncDecTarget::A),
             0x0F => Instruction::Rrc(IncDecTarget::A),
             0x1F => Instruction::Rr(IncDecTarget::A),
+            0xC3 => Instruction::Jp,
+            0xC2 => Instruction::Jpcc(!self.registers.get_z_flag()),
+            0xCA => Instruction::Jpcc(self.registers.get_z_flag()),
+            0xD2 => Instruction::Jpcc(!self.registers.get_c_flag()),
+            0xDA => Instruction::Jpcc(self.registers.get_c_flag()),
+            0xE9 => Instruction::Jphl,
+            0x18 => Instruction::Jrn,
+            0x20 => Instruction::Jrcc(!self.registers.get_z_flag()),
+            0x28 => Instruction::Jrcc(self.registers.get_z_flag()),
+            0x30 => Instruction::Jrcc(!self.registers.get_c_flag()),
+            0x38 => Instruction::Jrcc(self.registers.get_c_flag()),
             _ => panic!("unknown opcode {}", opcode)
         }
     }
@@ -631,6 +643,19 @@ impl Cpu {
                     IncDecTarget::HL => self.mmu.write_byte(self.registers.get_hl(), self.reset(self.mmu.read_byte(self.registers.get_hl()), *bit)),
                 }
             }
+            Instruction::Jp => self.jump(self.read_word()),
+            Instruction::Jpcc(condition) => {
+                if *condition {
+                    self.jump(self.read_word());
+                }
+            }
+            Instruction::Jphl => self.jump(self.registers.get_hl()),
+            Instruction::Jrn => self.jump(self.registers.get_pc() + u16::from(self.mmu.read_byte(self.registers.get_pc()))),
+            Instruction::Jrcc(condition) => {
+                if *condition {
+                    self.jump(self.registers.get_pc() + u16::from(self.mmu.read_byte(self.registers.get_pc())));
+                }
+            }
         }
     }
 
@@ -865,6 +890,10 @@ impl Cpu {
 
     fn reset(&self, value: u8, bit: u8) -> u8 {
         value ^ (1 << bit)
+    }
+
+    fn jump(&mut self, address: u16) {
+        self.registers.set_pc(address);
     }
 }
 
@@ -2023,5 +2052,129 @@ mod tests {
         cpu.registers.set_hl(0xABCD);
         cpu.mmu.write_byte(cpu.registers.get_hl(), 0b1111_1111);
         test_register(&mut cpu, IncDecTarget::HL, register_hl_opcodes);
+    }
+
+    #[test]
+    fn cpu_jp_test() {
+        let mut cpu = Cpu::new();
+
+        // jump
+        cpu.mmu.write_byte(cpu.registers.get_pc(), 0xCD);
+        cpu.mmu.write_byte(cpu.registers.get_pc() + 1, 0xAB);
+        let jp = cpu.decode_opcode(0xC3);
+        cpu.execute_instruction(jp);
+        assert_eq!(cpu.registers.get_pc(), 0xABCD);
+
+        // jump if not Z
+        cpu.mmu.write_byte(cpu.registers.get_pc(), 0xAD);
+        cpu.mmu.write_byte(cpu.registers.get_pc() + 1, 0xDE);
+        cpu.registers.set_z_flag(true);
+        let jp_nz_true = cpu.decode_opcode(0xC2);
+        cpu.execute_instruction(jp_nz_true);
+        assert_eq!(cpu.registers.get_pc(), 0xABCD);
+
+        cpu.registers.set_z_flag(false);
+        let jp_nz_false = cpu.decode_opcode(0xC2);
+        cpu.execute_instruction(jp_nz_false);
+        assert_eq!(cpu.registers.get_pc(), 0xDEAD);
+
+        // jump if Z
+        cpu.mmu.write_byte(cpu.registers.get_pc(), 0xEF);
+        cpu.mmu.write_byte(cpu.registers.get_pc() + 1, 0xBE);
+        let jp_z_false = cpu.decode_opcode(0xCA);
+        cpu.execute_instruction(jp_z_false);
+        assert_eq!(cpu.registers.get_pc(), 0xDEAD);
+
+        cpu.registers.set_z_flag(true);
+        let jp_z_true = cpu.decode_opcode(0xCA);
+        cpu.execute_instruction(jp_z_true);
+        assert_eq!(cpu.registers.get_pc(), 0xBEEF);
+
+        // jump if not C
+        cpu.mmu.write_byte(cpu.registers.get_pc(), 0x34);
+        cpu.mmu.write_byte(cpu.registers.get_pc() + 1, 0x12);
+        cpu.registers.set_c_flag(true);
+        let jp_nc_true = cpu.decode_opcode(0xD2);
+        cpu.execute_instruction(jp_nc_true);
+        assert_eq!(cpu.registers.get_pc(), 0xBEEF);
+
+        cpu.registers.set_c_flag(false);
+        let jp_nc_false = cpu.decode_opcode(0xD2);
+        cpu.execute_instruction(jp_nc_false);
+        assert_eq!(cpu.registers.get_pc(), 0x1234);
+
+        // jump if C
+        cpu.mmu.write_byte(cpu.registers.get_pc(), 0x89);
+        cpu.mmu.write_byte(cpu.registers.get_pc() + 1, 0x67);
+        let jp_c_false = cpu.decode_opcode(0xDA);
+        cpu.execute_instruction(jp_c_false);
+        assert_eq!(cpu.registers.get_pc(), 0x1234);
+
+        cpu.registers.set_c_flag(true);
+        let jp_c_true = cpu.decode_opcode(0xDA);
+        cpu.execute_instruction(jp_c_true);
+        assert_eq!(cpu.registers.get_pc(), 0x6789);
+
+        // jump to (hl)
+        cpu.registers.set_hl(0x9007);
+        let jphl = cpu.decode_opcode(0xE9);
+        cpu.execute_instruction(jphl);
+        assert_eq!(cpu.registers.get_pc(), 0x9007);
+
+        // jump to current address + n
+        cpu.mmu.write_byte(cpu.registers.get_pc(), 0xFF);
+        let jrn = cpu.decode_opcode(0x18);
+        cpu.execute_instruction(jrn);
+        assert_eq!(cpu.registers.get_pc(), 0x9007 + 0xFF);
+
+        // jump to current address + n if not Z
+        cpu.registers.set_pc(0x1234);
+        cpu.mmu.write_byte(cpu.registers.get_pc(), 0xFF);
+        cpu.registers.set_z_flag(true);
+        let jr_nz_true = cpu.decode_opcode(0x20);
+        cpu.execute_instruction(jr_nz_true);
+        assert_eq!(cpu.registers.get_pc(), 0x1234);
+
+        cpu.registers.set_z_flag(false);
+        let jr_nz_false = cpu.decode_opcode(0x20);
+        cpu.execute_instruction(jr_nz_false);
+        assert_eq!(cpu.registers.get_pc(), 0x1234 + 0xFF);
+
+        // jump to current address + n if Z
+        cpu.registers.set_pc(0x2345);
+        cpu.mmu.write_byte(cpu.registers.get_pc(), 0xFF);
+        let jr_z_false = cpu.decode_opcode(0x28);
+        cpu.execute_instruction(jr_z_false);
+        assert_eq!(cpu.registers.get_pc(), 0x2345);
+
+        cpu.registers.set_z_flag(true);
+        let jr_z_true = cpu.decode_opcode(0x28);
+        cpu.execute_instruction(jr_z_true);
+        assert_eq!(cpu.registers.get_pc(), 0x2345 + 0xFF);
+
+        // jump to current address + n if not C
+        cpu.registers.set_pc(0x3456);
+        cpu.mmu.write_byte(cpu.registers.get_pc(), 0xFF);
+        cpu.registers.set_c_flag(true);
+        let jr_nc_true = cpu.decode_opcode(0x30);
+        cpu.execute_instruction(jr_nc_true);
+        assert_eq!(cpu.registers.get_pc(), 0x3456);
+
+        cpu.registers.set_c_flag(false);
+        let jr_nc_false = cpu.decode_opcode(0x30);
+        cpu.execute_instruction(jr_nc_false);
+        assert_eq!(cpu.registers.get_pc(), 0x3456 + 0xFF);
+
+        // jump to current address + n if C
+        cpu.registers.set_pc(0x4567);
+        cpu.mmu.write_byte(cpu.registers.get_pc(), 0xFF);
+        let jr_c_false = cpu.decode_opcode(0x38);
+        cpu.execute_instruction(jr_c_false);
+        assert_eq!(cpu.registers.get_pc(), 0x4567);
+
+        cpu.registers.set_c_flag(true);
+        let jr_c_true = cpu.decode_opcode(0x38);
+        cpu.execute_instruction(jr_c_true);
+        assert_eq!(cpu.registers.get_pc(), 0x4567 + 0xFF);
     }
 }

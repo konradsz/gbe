@@ -34,6 +34,11 @@ pub enum Instruction {
     Bit(IncDecTarget, u8),
     Set(IncDecTarget, u8),
     Res(IncDecTarget, u8),
+    Jp,
+    Jpcc(bool),
+    Jphl,
+    Jrn,
+    Jrcc(bool),
 }
 
 #[rustfmt::skip]
