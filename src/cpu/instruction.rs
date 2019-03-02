@@ -1,3 +1,4 @@
+#[derive(Debug)]
 pub enum Instruction {
     Load(LoadRegister, u8),
     LoadToMemory(u16, LoadRegister),
@@ -47,21 +48,25 @@ pub enum Instruction {
 }
 
 #[rustfmt::skip]
+#[derive(Debug)]
 pub enum LoadRegister {
     A, B, C, D, E, H, L
 }
 
 #[rustfmt::skip]
+#[derive(Debug)]
 pub enum TargetRegister8 {
     A, B, C, D, E, H, L, HL,
 }
 
 #[rustfmt::skip]
+#[derive(Debug)]
 pub enum TargetRegister16 {
     BC, DE, HL, SP
 }
 
 #[rustfmt::skip]
+#[derive(Debug)]
 pub enum StackOperationRegisters {
     AF, BC, DE, HL
 }
