@@ -17,16 +17,30 @@ impl Cpu {
         }
     }
 
+    pub fn run(&mut self) {
+        loop {
+            self.step();
+
+            if (self.registers.get_pc() > 255) {
+                break;
+            }
+        }
+    }
+
     fn step(&mut self) {
         let opcode = self.next_byte();
 
         let instruction;
         if opcode == 0xCB {
+            print!("0x{:X}", opcode);
             let prefixed_opcode = self.next_byte();
+            print!("{:X}:\t", prefixed_opcode);
             instruction = self.decode_prefixed_opcode(prefixed_opcode);
         } else {
+            print!("0x{:X}:\t", opcode);
             instruction = self.decode_opcode(opcode);
         }
+        println!("{:?}", instruction);
         self.execute_instruction(instruction);
     }
 
@@ -676,8 +690,8 @@ impl Cpu {
                 self.jump(address);
             }
             Instruction::Jpcc(condition) => {
+                let address = self.next_word();
                 if *condition {
-                    let address = self.next_word();
                     self.jump(address);
                 }
             }
@@ -687,9 +701,11 @@ impl Cpu {
                 self.jump(address)
             }
             Instruction::Jrcc(condition) => {
+                let offset_byte = self.next_byte() as i8;
                 if *condition {
-                    let address = self.registers.get_pc() + u16::from(self.next_byte());
-                    self.jump(address)
+                    dbg!(self.registers.get_pc() as i16);
+                    let address = self.registers.get_pc() as i16 + i16::from(offset_byte);
+                    self.jump(address as u16)
                 }
             }
             Instruction::Call => self.call(),
@@ -740,7 +756,6 @@ impl Cpu {
     }
 
     fn add_signed_byte_to_word(&mut self, byte: i8, word: u16) -> u16 {
-        dbg!(byte);
         self.registers.set_z_flag(false);
         self.registers.set_n_flag(false);
 
@@ -2146,8 +2161,10 @@ mod tests {
         cpu.registers.set_z_flag(true);
         let jp_nz_true = cpu.decode_opcode(0xC2);
         cpu.execute_instruction(jp_nz_true);
-        assert_eq!(cpu.registers.get_pc(), 0xABCD);
+        assert_eq!(cpu.registers.get_pc(), 0xABCD + 2);
 
+        cpu.mmu.write_byte(cpu.registers.get_pc(), 0xAD);
+        cpu.mmu.write_byte(cpu.registers.get_pc() + 1, 0xDE);
         cpu.registers.set_z_flag(false);
         let jp_nz_false = cpu.decode_opcode(0xC2);
         cpu.execute_instruction(jp_nz_false);
@@ -2158,8 +2175,10 @@ mod tests {
         cpu.mmu.write_byte(cpu.registers.get_pc() + 1, 0xBE);
         let jp_z_false = cpu.decode_opcode(0xCA);
         cpu.execute_instruction(jp_z_false);
-        assert_eq!(cpu.registers.get_pc(), 0xDEAD);
+        assert_eq!(cpu.registers.get_pc(), 0xDEAD + 2);
 
+        cpu.mmu.write_byte(cpu.registers.get_pc(), 0xEF);
+        cpu.mmu.write_byte(cpu.registers.get_pc() + 1, 0xBE);
         cpu.registers.set_z_flag(true);
         let jp_z_true = cpu.decode_opcode(0xCA);
         cpu.execute_instruction(jp_z_true);
@@ -2171,8 +2190,10 @@ mod tests {
         cpu.registers.set_c_flag(true);
         let jp_nc_true = cpu.decode_opcode(0xD2);
         cpu.execute_instruction(jp_nc_true);
-        assert_eq!(cpu.registers.get_pc(), 0xBEEF);
+        assert_eq!(cpu.registers.get_pc(), 0xBEEF + 2);
 
+        cpu.mmu.write_byte(cpu.registers.get_pc(), 0x34);
+        cpu.mmu.write_byte(cpu.registers.get_pc() + 1, 0x12);
         cpu.registers.set_c_flag(false);
         let jp_nc_false = cpu.decode_opcode(0xD2);
         cpu.execute_instruction(jp_nc_false);
@@ -2183,8 +2204,10 @@ mod tests {
         cpu.mmu.write_byte(cpu.registers.get_pc() + 1, 0x67);
         let jp_c_false = cpu.decode_opcode(0xDA);
         cpu.execute_instruction(jp_c_false);
-        assert_eq!(cpu.registers.get_pc(), 0x1234);
+        assert_eq!(cpu.registers.get_pc(), 0x1234 + 2);
 
+        cpu.mmu.write_byte(cpu.registers.get_pc(), 0x89);
+        cpu.mmu.write_byte(cpu.registers.get_pc() + 1, 0x67);
         cpu.registers.set_c_flag(true);
         let jp_c_true = cpu.decode_opcode(0xDA);
         cpu.execute_instruction(jp_c_true);
@@ -2204,53 +2227,58 @@ mod tests {
 
         // jump to current address + n if not Z
         cpu.registers.set_pc(0x1234);
-        cpu.mmu.write_byte(cpu.registers.get_pc(), 0xFF);
+        cpu.mmu.write_byte(cpu.registers.get_pc(), 0x7B);
         cpu.registers.set_z_flag(true);
         let jr_nz_true = cpu.decode_opcode(0x20);
         cpu.execute_instruction(jr_nz_true);
-        assert_eq!(cpu.registers.get_pc(), 0x1234);
+        assert_eq!(cpu.registers.get_pc(), 0x1234 + 1);
 
+        cpu.registers.set_pc(0x1234);
+        cpu.mmu.write_byte(cpu.registers.get_pc(), 0x7F);
         cpu.registers.set_z_flag(false);
         let jr_nz_false = cpu.decode_opcode(0x20);
         cpu.execute_instruction(jr_nz_false);
-        assert_eq!(cpu.registers.get_pc(), 0x1234 + 0xFF);
+        assert_eq!(cpu.registers.get_pc(), 0x1234 + 1 + 0x7F);
 
         // jump to current address + n if Z
         cpu.registers.set_pc(0x2345);
-        cpu.mmu.write_byte(cpu.registers.get_pc(), 0xFF);
+        cpu.mmu.write_byte(cpu.registers.get_pc(), 0x7F);
         let jr_z_false = cpu.decode_opcode(0x28);
         cpu.execute_instruction(jr_z_false);
-        assert_eq!(cpu.registers.get_pc(), 0x2345);
+        assert_eq!(cpu.registers.get_pc(), 0x2345 + 1);
 
+        cpu.registers.set_pc(0x2345);
         cpu.registers.set_z_flag(true);
         let jr_z_true = cpu.decode_opcode(0x28);
         cpu.execute_instruction(jr_z_true);
-        assert_eq!(cpu.registers.get_pc(), 0x2345 + 0xFF);
+        assert_eq!(cpu.registers.get_pc(), 0x2345 + 1 + 0x7F);
 
         // jump to current address + n if not C
         cpu.registers.set_pc(0x3456);
-        cpu.mmu.write_byte(cpu.registers.get_pc(), 0xFF);
+        cpu.mmu.write_byte(cpu.registers.get_pc(), 0x7F);
         cpu.registers.set_c_flag(true);
         let jr_nc_true = cpu.decode_opcode(0x30);
         cpu.execute_instruction(jr_nc_true);
-        assert_eq!(cpu.registers.get_pc(), 0x3456);
+        assert_eq!(cpu.registers.get_pc(), 0x3456 + 1);
 
+        cpu.registers.set_pc(0x3456);
         cpu.registers.set_c_flag(false);
         let jr_nc_false = cpu.decode_opcode(0x30);
         cpu.execute_instruction(jr_nc_false);
-        assert_eq!(cpu.registers.get_pc(), 0x3456 + 0xFF);
+        assert_eq!(cpu.registers.get_pc(), 0x3456 + 1 + 0x7F);
 
         // jump to current address + n if C
         cpu.registers.set_pc(0x4567);
-        cpu.mmu.write_byte(cpu.registers.get_pc(), 0xFF);
+        cpu.mmu.write_byte(cpu.registers.get_pc(), 0x7F);
         let jr_c_false = cpu.decode_opcode(0x38);
         cpu.execute_instruction(jr_c_false);
-        assert_eq!(cpu.registers.get_pc(), 0x4567);
+        assert_eq!(cpu.registers.get_pc(), 0x4567 + 1);
 
+        cpu.registers.set_pc(0x4567);
         cpu.registers.set_c_flag(true);
         let jr_c_true = cpu.decode_opcode(0x38);
         cpu.execute_instruction(jr_c_true);
-        assert_eq!(cpu.registers.get_pc(), 0x4567 + 0xFF);
+        assert_eq!(cpu.registers.get_pc(), 0x4567 + 1 + 0x7F);
     }
 
     #[test]
