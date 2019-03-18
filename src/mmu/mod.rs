@@ -1,3 +1,7 @@
+//mod memory;
+
+//use memory::Memory;
+
 pub struct Mmu {
     memory: [u8; Mmu::TOTAL_MEMORY_SIZE],
 }
